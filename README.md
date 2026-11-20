@@ -238,4 +238,5 @@ mailer/
 
 ## License
 
-MIT — do what you want.
+Released under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+See [`LICENSE`](LICENSE) for the full license text.

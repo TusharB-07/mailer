@@ -192,7 +192,7 @@ To swap in your own theme:
 - Edit the variables under `:root` / `[data-theme="dark"]` in `public/app.css`, **or**
 - Drop your own stylesheet at `public/app.css` and redeploy.
 
-The Geist webfont loads from the jsDelivr CDN. To bundle it locally (no runtime CDN dependency), download `Geist-Variable.woff2` into `public/fonts/` and change the `@font-face` `src` to `/fonts/Geist-Variable.woff2`.
+The Geist webfont is bundled locally at `public/fonts/Geist-Variable.woff2` and loaded via the `@font-face` `src` in `public/app.css` — no runtime font CDN dependency. To update it, replace that file.
 
 ---
 

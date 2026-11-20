@@ -1,0 +1,25 @@
+{
+  "name": "mailer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bulk + scheduled email sender for asterick.tech — Cloudflare Worker + D1 + Resend.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 execute mailflare --file=./schema.sql --local",
+    "db:migrate:remote": "wrangler d1 execute mailflare --file=./schema.sql --remote",
+    "db:migrate": "npm run db:migrate:remote",
+    "cf-typegen": "wrangler types",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.9.0",
+    "hono": "^4.13.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261118.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,0 +1,58 @@
+name = "mailer"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ------------------------------------------------------------------
+# Static assets: the dashboard UI in ./public is served directly by
+# the Workers runtime. The Hono app handles /api/* and the cron.
+# ------------------------------------------------------------------
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# ------------------------------------------------------------------
+# D1: bind to the SAME database Mailflare already uses, so we can read
+# the live mailbox list for the sender dropdown. Find the id with:
+#   npx wrangler d1 list
+# ------------------------------------------------------------------
+[[d1_databases]]
+binding = "DB"
+database_name = "mailflare"
+database_id = "REPLACE_WITH_YOUR_MAILFLARE_D1_ID"
+
+# ------------------------------------------------------------------
+# R2: attachment storage. Create it once with:
+#   npx wrangler r2 bucket create mailer-attachments
+# ------------------------------------------------------------------
+[[r2_buckets]]
+binding = "ATTACH"
+bucket_name = "mailer-attachments"
+
+# ------------------------------------------------------------------
+# Cron: the scheduler ticks once a minute. All interval / scheduled /
+# recurring logic is driven from D1 (next_run_at), so you can pick any
+# interval per campaign without redeploying.
+# ------------------------------------------------------------------
+[triggers]
+crons = ["* * * * *"]
+
+# ------------------------------------------------------------------
+# Non-secret configuration. Override in the dashboard if needed.
+# ------------------------------------------------------------------
+[vars]
+APP_NAME = "Mailer"
+DEFAULT_FROM_DOMAIN = "asterick.tech"
+DEFAULT_BATCH_SIZE = "5"
+DEFAULT_INTERVAL_MINUTES = "30"
+RESEND_BATCH_MAX = "100"
+RESEND_API_BASE = "https://api.resend.com"
+SESSION_TTL_HOURS = "168"
+
+# ------------------------------------------------------------------
+# Secrets — set with wrangler (never commit these):
+#   npx wrangler secret put RESEND_API_KEY
+#   npx wrangler secret put AUTH_PASSWORD
+#   npx wrangler secret put SESSION_SECRET
+# ------------------------------------------------------------------

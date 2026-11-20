@@ -1,0 +1,7 @@
+# Local development secrets — copy to .dev.vars and fill in.
+# NEVER commit the real .dev.vars file (it is gitignored).
+# In production these are set with: npx wrangler secret put <NAME>
+
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+AUTH_PASSWORD=choose-a-long-random-admin-password
+SESSION_SECRET=any-random-string-at-least-32-chars

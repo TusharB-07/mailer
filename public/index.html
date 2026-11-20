@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mailer — asterick.tech</title>
+    <meta name="robots" content="noindex" />
+    <link rel="stylesheet" href="/app.css" />
+    <!-- Geist font (asterick.tech uses Geist). Falls back to Inter / system. -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    />
+    <!-- SheetJS: parses the Excel file entirely in the browser. -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  </head>
+  <body>
+    <!-- ===================== LOGIN ===================== -->
+    <main id="login-view" class="login-wrap" hidden>
+      <form id="login-form" class="card login-card">
+        <div class="brand">
+          <span class="brand-dot"></span>
+          <span class="brand-name">Mailer</span>
+        </div>
+        <h1>Sign in</h1>
+        <p class="muted">Enter your admin password to continue.</p>
+        <label class="field">
+          <span>Password</span>
+          <input type="password" id="login-password" autocomplete="current-password" required />
+        </label>
+        <button class="btn primary" type="submit">Sign in</button>
+        <p id="login-error" class="error" hidden></p>
+      </form>
+    </main>
+
+    <!-- ===================== APP ===================== -->
+    <div id="app-view" class="app" hidden>
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-dot"></span>
+          <span class="brand-name">Mailer</span>
+          <span class="brand-sub">asterick.tech</span>
+        </div>
+        <nav>
+          <button class="nav-item active" data-view="dashboard">Campaigns</button>
+          <button class="nav-item" data-view="new">New campaign</button>
+        </nav>
+        <div class="sidebar-foot">
+          <button id="theme-toggle" class="nav-item" title="Toggle theme">Theme</button>
+          <button id="logout-btn" class="nav-item">Sign out</button>
+        </div>
+      </aside>
+
+      <section class="content">
+        <!-- ---------- DASHBOARD ---------- -->
+        <div id="view-dashboard" class="view">
+          <header class="page-head">
+            <div>
+              <h1>Campaigns</h1>
+              <p class="muted">Bulk + scheduled sending via Resend.</p>
+            </div>
+            <button class="btn primary" data-view="new">+ New campaign</button>
+          </header>
+          <div id="campaign-list" class="campaign-list">
+            <p class="muted">Loading…</p>
+          </div>
+        </div>
+
+        <!-- ---------- NEW CAMPAIGN ---------- -->
+        <div id="view-new" class="view" hidden>
+          <header class="page-head">
+            <div>
+              <h1>New campaign</h1>
+              <p class="muted">Upload an Excel sheet, pick a sender, choose when to send.</p>
+            </div>
+            <button class="btn ghost" data-view="dashboard">Cancel</button>
+          </header>
+
+          <form id="campaign-form" class="grid">
+            <!-- 1. Excel upload -->
+            <div class="card span-2">
+              <h2>1 · Recipients</h2>
+              <p class="muted">
+                Excel with columns <code>Email</code>, <code>Subject</code>, <code>Body</code>.
+                Any extra columns become merge tags (e.g. <code>Name</code> → <code>&#123;&#123;Name&#125;&#125;</code>).
+                Optional <code>SendAt</code> column overrides per-row timing.
+              </p>
+              <label class="drop" id="dropzone">
+                <input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden />
+                <strong>Drop your Excel file here</strong>
+                <span class="muted">or click to browse — .xlsx, .xls, .csv</span>
+              </label>
+              <div id="file-info" class="file-info" hidden></div>
+              <div id="sheet-preview" class="table-wrap" hidden></div>
+            </div>
+
+            <!-- 2. Sender + content -->
+            <div class="card">
+              <h2>2 · Sender &amp; content</h2>
+              <label class="field">
+                <span>Campaign name</span>
+                <input id="f-name" placeholder="November outreach" required />
+              </label>
+              <label class="field">
+                <span>From (sender)</span>
+                <select id="f-sender"></select>
+                <small class="muted">Pulled live from your Mailflare mailboxes.</small>
+              </label>
+              <label class="field">
+                <span>Reply-to (optional)</span>
+                <input id="f-replyto" type="email" placeholder="replies@asterick.tech" />
+              </label>
+              <label class="field">
+                <span>Subject template</span>
+                <input id="f-subject" placeholder="Hi {{Name}}, a quick note" required />
+              </label>
+              <label class="field">
+                <span>Body template (HTML)</span>
+                <textarea id="f-body" rows="8" placeholder="<p>Hello {{Name}}, ...</p>" required></textarea>
+              </label>
+              <button type="button" id="btn-preview" class="btn ghost">Live preview</button>
+            </div>
+
+            <!-- 3. Schedule -->
+            <div class="card">
+              <h2>3 · Schedule</h2>
+              <div class="seg" id="schedule-mode">
+                <button type="button" class="seg-btn active" data-mode="now">Send now</button>
+                <button type="button" class="seg-btn" data-mode="datetime">Pick date &amp; time</button>
+                <button type="button" class="seg-btn" data-mode="interval">Interval drip</button>
+              </div>
+              <label class="field" id="field-datetime" hidden>
+                <span>Send at</span>
+                <input id="f-scheduledat" type="datetime-local" />
+              </label>
+              <label class="field" id="field-interval">
+                <span>Interval (minutes between batches)</span>
+                <input id="f-interval" type="number" min="1" max="1440" value="30" />
+              </label>
+              <label class="field">
+                <span>Batch size (emails per tick)</span>
+                <input id="f-batch" type="number" min="1" max="100" value="5" />
+              </label>
+              <label class="check">
+                <input id="f-tracking" type="checkbox" checked />
+                <span>Open &amp; click tracking</span>
+              </label>
+              <details class="recur">
+                <summary>Recurring campaign</summary>
+                <div class="row">
+                  <label class="field">
+                    <span>Repeat</span>
+                    <select id="f-recur-freq">
+                      <option value="">Off</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span>Until (optional)</span>
+                    <input id="f-recur-until" type="datetime-local" />
+                  </label>
+                </div>
+              </details>
+            </div>
+
+            <!-- 4. Attachments -->
+            <div class="card span-2">
+              <h2>4 · Attachments (optional)</h2>
+              <p class="muted">Up to 10 files, 10 MB each. Attached to every email in the campaign.</p>
+              <input id="attach-input" type="file" multiple />
+              <div id="attach-list" class="attach-list"></div>
+            </div>
+
+            <!-- 5. Submit -->
+            <div class="card span-2 submit-bar">
+              <div id="create-status" class="muted"></div>
+              <button type="submit" class="btn primary" id="btn-create">Create campaign</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- ---------- CAMPAIGN DETAIL ---------- -->
+        <div id="view-detail" class="view" hidden>
+          <header class="page-head">
+            <div>
+              <button class="btn ghost back" data-view="dashboard">← Back</button>
+              <h1 id="detail-title">Campaign</h1>
+              <p id="detail-sub" class="muted"></p>
+            </div>
+            <div class="row gap">
+              <button id="btn-pause" class="btn ghost">Pause</button>
+              <button id="btn-resume" class="btn ghost" hidden>Resume</button>
+              <button id="btn-test" class="btn ghost">Test send</button>
+              <button id="btn-export" class="btn ghost">Export CSV</button>
+              <button id="btn-delete" class="btn danger">Delete</button>
+            </div>
+          </header>
+          <div id="detail-stats" class="stats"></div>
+          <div id="detail-outbox" class="table-wrap"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- test-send modal -->
+    <div id="test-modal" class="modal" hidden>
+      <div class="card modal-card">
+        <h2>Send a test</h2>
+        <p class="muted">Sends the first row's rendered email to the address below.</p>
+        <label class="field">
+          <span>Test recipient</span>
+          <input id="test-email" type="email" placeholder="you@asterick.tech" />
+        </label>
+        <div class="row gap end">
+          <button id="test-cancel" class="btn ghost">Cancel</button>
+          <button id="test-confirm" class="btn primary">Send test</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- preview modal -->
+    <div id="preview-modal" class="modal" hidden>
+      <div class="card modal-card wide">
+        <h2>Preview</h2>
+        <div id="preview-subject" class="preview-sub"></div>
+        <iframe id="preview-frame" class="preview-frame"></iframe>
+        <div class="row gap end">
+          <button id="preview-close" class="btn ghost">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- toast -->
+    <div id="toast" class="toast" hidden></div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -431,6 +431,7 @@ async function openDetail(id) {
     const c = await api(`/api/campaigns/${id}`).catch(() => null);
     if (!c) return;
     renderDetail(c);
+    loadInsights(id);
     if (c.campaign.status !== "active") {
       clearInterval(state.pollTimer);
       state.pollTimer = null;
@@ -444,9 +445,49 @@ async function loadDetail() {
   try {
     const r = await api(`/api/campaigns/${state.detailId}`);
     renderDetail(r);
+    loadInsights(state.detailId);
   } catch (e) {
     title.textContent = "Error";
     $("#detail-sub").textContent = e.message;
+  }
+}
+
+// Insights: delivered / opened / clicked / bounced counts + recent events.
+async function loadInsights(id) {
+  const statsEl = $("#insight-stats");
+  const eventsEl = $("#insight-events");
+  if (!statsEl || !eventsEl) return;
+  try {
+    const r = await api(`/api/campaigns/${id}/events`);
+    const n = r.counts || {};
+    statsEl.innerHTML = `
+      <div class="stat"><div class="num" style="color:var(--ok)">${n.delivered || 0}</div><div class="lbl">Delivered</div></div>
+      <div class="stat"><div class="num">${n.opened || 0}</div><div class="lbl">Opened</div></div>
+      <div class="stat"><div class="num">${n.clicked || 0}</div><div class="lbl">Clicked</div></div>
+      <div class="stat"><div class="num" style="color:var(--danger)">${n.bounced || 0}</div><div class="lbl">Bounced</div></div>`;
+
+    const events = r.events || [];
+    if (!events.length) {
+      eventsEl.hidden = true;
+      eventsEl.innerHTML = "";
+      return;
+    }
+    eventsEl.hidden = false;
+    eventsEl.innerHTML = `<table>
+      <thead><tr><th>When</th><th>Event</th><th>Resend ID</th></tr></thead>
+      <tbody>${events
+        .slice(0, 50)
+        .map(
+          (ev) => `<tr>
+        <td>${fmtDate(ev.created_at)}</td>
+        <td><span class="badge">${escapeHtml(ev.event_type)}</span></td>
+        <td>${escapeHtml(ev.resend_id || "—")}</td>
+      </tr>`
+        )
+        .join("")}</tbody></table>`;
+  } catch (e) {
+    statsEl.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
+    eventsEl.hidden = true;
   }
 }
 

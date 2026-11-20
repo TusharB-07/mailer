@@ -1,5 +1,5 @@
 // D1 query helpers for campaign + outbox + attachment operations.
-import type { Env, CampaignRow, OutboxRow, AttachmentRow } from "./types";
+import type { Env, CampaignRow, OutboxRow, AttachmentRow, EventRow } from "./types";
 import { newId, nowSec } from "./util";
 
 export async function insertCampaign(
@@ -186,6 +186,36 @@ export async function insertAttachment(
     .bind(id, data.campaignId, data.r2Key, data.filename, data.mimeType, data.size, nowSec())
     .run();
   return id;
+}
+
+export async function listEventsFor(
+  env: Env,
+  id: string,
+  limit = 200
+): Promise<EventRow[]> {
+  const res = await env.DB.prepare(
+    "SELECT * FROM mailer_events WHERE campaign_id = ? ORDER BY created_at DESC LIMIT ?"
+  )
+    .bind(id, limit)
+    .all<EventRow>();
+  return (res.results || []) as EventRow[];
+}
+
+// Counts per raw event_type (e.g. "email.delivered" -> n). Normalized by the caller.
+export async function countEventsFor(
+  env: Env,
+  id: string
+): Promise<Record<string, number>> {
+  const res = await env.DB.prepare(
+    "SELECT event_type, COUNT(*) AS n FROM mailer_events WHERE campaign_id = ? GROUP BY event_type"
+  )
+    .bind(id)
+    .all<{ event_type: string; n: number }>();
+  const out: Record<string, number> = {};
+  for (const r of (res.results || []) as Array<{ event_type: string; n: number }>) {
+    out[r.event_type] = r.n;
+  }
+  return out;
 }
 
 export async function recordEvent(

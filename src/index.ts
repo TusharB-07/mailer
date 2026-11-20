@@ -31,6 +31,8 @@ import {
   deleteCampaign,
   recomputeCounts,
   recordEvent,
+  listEventsFor,
+  countEventsFor,
 } from "./db";
 import { renderMerge, buildMergeData, extractTags } from "./merge";
 import { sendBatch, sendOne, buildAttachments } from "./resend";
@@ -306,6 +308,29 @@ authed.get("/api/campaigns/:id", async (c) => {
   const outbox = await listOutboxForCampaign(c.env, id, 5000);
   const attachments = await listAttachmentsFor(c.env, id);
   return c.json({ campaign, outbox, attachments });
+});
+
+// Delivery insights from the Resend webhook (mailer_events).
+authed.get("/api/campaigns/:id/events", async (c) => {
+  const id = c.req.param("id");
+  const campaign = await getCampaign(c.env, id);
+  if (!campaign) return c.json({ error: "not found" }, 404);
+
+  const [events, raw] = await Promise.all([
+    listEventsFor(c.env, id, 200),
+    countEventsFor(c.env, id),
+  ]);
+
+  const counts = { delivered: 0, opened: 0, clicked: 0, bounced: 0 };
+  for (const [type, n] of Object.entries(raw)) {
+    const t = type.toLowerCase();
+    if (t.includes("delivered")) counts.delivered += n;
+    else if (t.includes("opened")) counts.opened += n;
+    else if (t.includes("clicked")) counts.clicked += n;
+    else if (t.includes("bounced") || t.includes("failed")) counts.bounced += n;
+  }
+
+  return c.json({ events, counts });
 });
 
 authed.post("/api/campaigns/:id/pause", async (c) => {

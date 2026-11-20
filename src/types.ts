@@ -72,3 +72,13 @@ export interface AttachmentRow {
   size: number;
   created_at: number;
 }
+
+export interface EventRow {
+  id: number;
+  campaign_id: string | null;
+  outbox_id: string | null;
+  event_type: string;
+  resend_id: string | null;
+  payload: string | null;
+  created_at: number;
+}

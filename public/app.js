@@ -1,7 +1,12 @@
 /* Mailer dashboard client. Vanilla JS. Parses Excel in the browser with
-   SheetJS, posts JSON to the Worker API. All real validation is server-side. */
+   SheetJS, posts JSON to the Worker API. All real validation is server-side.
+   UI rebuilt to match asterick.tech design language exactly. */
+
 "use strict";
 
+// ============================================================
+// State
+// ============================================================
 const state = {
   rows: [],        // parsed recipients: [{email, subject?, body?, sendAt?, ...merge}]
   headers: [],     // detected column order
@@ -10,39 +15,26 @@ const state = {
   scheduleMode: "now",
   detailId: null,
   pollTimer: null,
+  reducedMotion: false,
 };
 
+// ============================================================
+// DOM shorthands
+// ============================================================
 const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => [...document.querySelectorAll(sel)];
+const $$ = (sel) => document.querySelectorAll(sel).length ? [...document.querySelectorAll(sel)] : [];
 
-// ----------------- tiny helpers -----------------
-function toast(msg, isError) {
+// ============================================================
+// Helpers
+// ============================================================
+function toast(msg, isError = false) {
   const t = $("#toast");
+  if (!t) return;
   t.textContent = msg;
   t.classList.toggle("error", !!isError);
   t.hidden = false;
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => (t.hidden = true), 3200);
-}
-
-async function api(path, opts = {}) {
-  const res = await fetch(path, {
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
-    ...opts,
-  });
-  let body = null;
-  const ct = res.headers.get("content-type") || "";
-  if (ct.includes("json")) body = await res.json().catch(() => null);
-  else body = await res.text().catch(() => null);
-  if (!res.ok) {
-    const msg = (body && body.error) || `HTTP ${res.status}`;
-    const err = new Error(msg);
-    err.status = res.status;
-    err.body = body;
-    throw err;
-  }
-  return body;
+  toast._t = setTimeout(() => (t.hidden = true), 4000);
 }
 
 function fmtDate(secs) {
@@ -59,7 +51,59 @@ function pct(c) {
   return Math.round(((c.sent_count + c.failed_count) / c.total_rows) * 100);
 }
 
-// ----------------- auth -----------------
+// ============================================================
+// Reduced motion detection
+// ============================================================
+(function initReducedMotion() {
+  const mq = matchMedia("(prefers-reduced-motion: reduce)");
+  state.reducedMotion = mq.matches;
+  mq.addEventListener("change", (e) => (state.reducedMotion = e.matches));
+})();
+
+// ============================================================
+// Reveal animation system (ONE primitive)
+// ============================================================
+// Fade in + rise 20px over 550ms, cubic-bezier(0.21, 0.47, 0.32, 0.98),
+// plays once, fires 60px inside viewport. Disabled under reduced motion.
+
+function initReveal() {
+  if (state.reducedMotion) return;
+
+  const observerOptions = {
+    root: null,
+    rootMargin: "60px",
+    threshold: 0,
+  };
+
+  const revealObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          el.style.transition = "opacity 0.55s cubic-bezier(0.21, 0.47, 0.32, 0.98), "
+            + "transform 0.55s cubic-bezier(0.21, 0.47, 0.32, 0.98)";
+          el.style.opacity = "1";
+          el.style.transform = "translateY(0)";
+          revealObserver.unobserve(el);
+        }
+      });
+    },
+    observerOptions
+  );
+
+  // Wrap all content blocks in Reveal on page load
+  document.querySelectorAll(".reveal").forEach((el) => {
+    el.style.opacity = "0";
+    el.style.transform = "translateY(20px)";
+    el.style.transition = "opacity 0.55s cubic-bezier(0.21, 0.47, 0.32, 0.98), "
+      + "transform 0.55s cubic-bezier(0.21, 0.47, 0.32, 0.98)";
+    revealObserver.observe(el);
+  });
+}
+
+// ============================================================
+// Auth
+// ============================================================
 async function checkAuth() {
   try {
     const r = await api("/api/session");
@@ -73,11 +117,12 @@ async function checkAuth() {
 function showLogin() {
   $("#app-view").hidden = true;
   $("#login-view").hidden = false;
-  $("#login-password").focus();
+  if ($("#login-password")) $("#login-password").focus();
 }
 function showApp() {
   $("#login-view").hidden = true;
   $("#app-view").hidden = false;
+  initReveal();
   showView("dashboard");
   loadSenders();
   loadCampaigns();
@@ -86,15 +131,14 @@ function showApp() {
 $("#login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const err = $("#login-error");
-  err.hidden = true;
-  const pw = $("#login-password").value;
+  if (err) err.hidden = true;
+  const pw = $("#login-password") ? $("#login-password").value : "";
   try {
     await api("/api/login", { method: "POST", body: JSON.stringify({ password: pw }) });
-    $("#login-password").value = "";
+    if ($("#login-password")) $("#login-password").value = "";
     showApp();
   } catch (e2) {
-    err.textContent = "Wrong password.";
-    err.hidden = false;
+    if (err) { err.textContent = "Wrong password."; err.hidden = false; }
   }
 });
 
@@ -103,7 +147,9 @@ $("#logout-btn").addEventListener("click", async () => {
   showLogin();
 });
 
-// ----------------- theme -----------------
+// ============================================================
+// Theme
+// ============================================================
 (function initTheme() {
   const saved = localStorage.getItem("mailer-theme");
   if (saved) document.documentElement.setAttribute("data-theme", saved);
@@ -117,7 +163,9 @@ $("#theme-toggle").addEventListener("click", () => {
   localStorage.setItem("mailer-theme", next);
 });
 
-// ----------------- view switching -----------------
+// ============================================================
+// View switching
+// ============================================================
 function showView(name) {
   $$(".view").forEach((v) => (v.hidden = true));
   const el = $(`#view-${name}`);
@@ -128,6 +176,9 @@ function showView(name) {
   if (name === "dashboard") loadCampaigns();
 }
 
+// ============================================================
+// Sidebar click
+// ============================================================
 document.body.addEventListener("click", (e) => {
   const t = e.target.closest("[data-view]");
   if (t) {
@@ -136,30 +187,36 @@ document.body.addEventListener("click", (e) => {
   }
 });
 
-// ----------------- senders -----------------
+// ============================================================
+// Senders
+// ============================================================
 async function loadSenders() {
   try {
     const r = await api("/api/senders");
     const sel = $("#f-sender");
-    sel.innerHTML = "";
     if (!r.senders.length) {
-      sel.innerHTML = '<option value="">— no Mailflare mailboxes found —</option>';
+      if (sel) sel.innerHTML = '<option value="">— no Mailflare mailboxes found —</option>';
       return;
     }
-    for (const s of r.senders) {
-      const opt = document.createElement("option");
-      opt.value = s.address;
-      opt.textContent = `${s.address}${s.displayName ? " — " + s.displayName : ""}${
-        s.sendingEnabled ? "" : " (sending off)"
-      }`;
-      sel.appendChild(opt);
+    if (sel) {
+      sel.innerHTML = "";
+      for (const s of r.senders) {
+        const opt = document.createElement("option");
+        opt.value = s.address;
+        opt.textContent = `${s.address}${s.displayName ? " — " + s.displayName : ""}${
+          s.sendingEnabled ? "" : " (sending off)"
+        }`;
+        sel.appendChild(opt);
+      }
     }
   } catch (e) {
     toast("Could not load senders: " + e.message, true);
   }
 }
 
-// ----------------- excel parsing (browser, SheetJS) -----------------
+// ============================================================
+// Excel parsing (browser, SheetJS)
+// ============================================================
 const dropzone = $("#dropzone");
 const fileInput = $("#file-input");
 
@@ -191,9 +248,11 @@ function findKey(obj, candidates) {
 
 async function handleFile(file) {
   const info = $("#file-info");
-  info.hidden = false;
-  info.textContent = `Reading ${file.name}…`;
+  if (info) { info.hidden = false; info.textContent = `Reading ${file.name}…`; }
   try {
+    if (typeof XLSX === "undefined") {
+      throw new Error("Excel parser (SheetJS) failed to load — check your network and try again.");
+    }
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -231,20 +290,27 @@ async function handleFile(file) {
       (h) => !["email", "subject", "body", "sendat", "send_at"].includes(h.toLowerCase())
     );
 
-    info.innerHTML = `<strong>${file.name}</strong> — ${rows.length} rows · ${
-      state.mergeKeys.length ? "merge tags: " + state.mergeKeys.map((k) => "{{" + k + "}}").join(", ") : "no merge tags"
-    }`;
+    const infoEl = $("#file-info");
+    if (infoEl) {
+      infoEl.innerHTML = `<strong>${file.name}</strong> — ${rows.length} rows · ${
+        state.mergeKeys.length ? "merge tags: " + state.mergeKeys.map((k) => "{{" + k + "}}").join(", ") : "no merge tags"
+      }`;
+    }
 
     renderPreview(rows);
   } catch (e) {
-    info.innerHTML = `<span class="error">${e.message}</span>`;
-    $("#sheet-preview").hidden = true;
+    const infoEl = $("#file-info");
+    if (infoEl) {
+      infoEl.innerHTML = `<span class="error">${e.message}</span>`;
+      $("#sheet-preview").hidden = true;
+    }
     state.rows = [];
   }
 }
 
 function renderPreview(rows) {
   const wrap = $("#sheet-preview");
+  if (!wrap) return;
   const cols = Object.keys(rows[0]).slice(0, 8);
   const head = cols.map((c) => `<th>${escapeHtml(c)}</th>`).join("");
   const body = rows
@@ -259,11 +325,13 @@ function renderPreview(rows) {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+    ({ "&": "&", "<": "<", ">": ">", '"': """, "'": "'" }[c])
   );
 }
 
-// ----------------- schedule mode -----------------
+// ============================================================
+// Schedule mode
+// ============================================================
 $("#schedule-mode").addEventListener("click", (e) => {
   const b = e.target.closest(".seg-btn");
   if (!b) return;
@@ -273,9 +341,21 @@ $("#schedule-mode").addEventListener("click", (e) => {
   $("#field-interval").hidden = state.scheduleMode === "now";
 });
 
-// ----------------- attachments -----------------
+// Interval helper text
+const intervalHelper = $("#interval-helper");
+if (intervalHelper) {
+  intervalHelper.addEventListener("click", () => {
+    if (state.scheduleMode === "now") {
+      alert("'Send now' sends batch 1 immediately. The interval applies to batches 2+.");
+    }
+  });
+}
+
+// ============================================================
+// Attachments
+// ============================================================
 $("#attach-input").addEventListener("change", async () => {
-  const files = [...$("#attach-input").files];
+  const files = [...($("#attach-input").files || [])];
   for (const f of files) {
     if (f.size > 10 * 1024 * 1024) {
       toast(`${f.name} is over 10 MB — skipped`, true);
@@ -302,6 +382,7 @@ $("#attach-input").addEventListener("change", async () => {
 
 function renderAttachments() {
   const list = $("#attach-list");
+  if (!list) return;
   list.innerHTML = state.attachments
     .map(
       (a) => `<div class="attach-item"><span>${escapeHtml(a.filename)} · ${Math.round(a.size / 1024)} KB</span></div>`
@@ -309,10 +390,12 @@ function renderAttachments() {
     .join("");
 }
 
-// ----------------- live preview -----------------
+// ============================================================
+// Live preview
+// ============================================================
 $("#btn-preview").addEventListener("click", async () => {
-  const subject = $("#f-subject").value;
-  const body = $("#f-body").value;
+  const subject = $("#f-subject") ? $("#f-subject").value : "";
+  const body = $("#f-body") ? $("#f-body").value : "";
   const sample = state.rows[0] || {};
   try {
     const r = await api("/api/preview", {
@@ -321,15 +404,17 @@ $("#btn-preview").addEventListener("click", async () => {
     });
     $("#preview-subject").textContent = r.subject || "(empty)";
     const frame = $("#preview-frame");
-    frame.srcdoc = r.html || "";
+    if (frame) frame.srcdoc = r.html || "";
     $("#preview-modal").hidden = false;
   } catch (e) {
     toast("Preview failed: " + e.message, true);
   }
 });
-$("#preview-close").addEventListener("click", () => ($("#preview-modal").hidden = true));
+$("#preview-close").addEventListener("click", () => $("#preview-modal").hidden = true);
 
-// ----------------- create campaign -----------------
+// ============================================================
+// Create campaign
+// ============================================================
 $("#campaign-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const status = $("#create-status");
@@ -337,57 +422,61 @@ $("#campaign-form").addEventListener("submit", async (e) => {
     toast("Upload an Excel file first", true);
     return;
   }
-  const sender = $("#f-sender").value;
+  const sender = $("#f-sender") ? $("#f-sender").value : "";
   if (!sender) {
     toast("Pick a sender", true);
     return;
   }
   const mode = state.scheduleMode;
-  const recurringFreq = $("#f-recur-freq").value;
-  const recurringUntil = $("#f-recur-until").value;
+  const recurringFreq = $("#f-recur-freq") ? $("#f-recur-freq").value : "";
+  const recurringUntil = $("#f-recur-until") ? $("#f-recur-until").value : "";
 
   const payload = {
-    name: $("#f-name").value.trim(),
+    name: $("#f-name") ? $("#f-name").value.trim() : "",
     senderAddress: sender,
-    replyTo: $("#f-replyto").value || undefined,
-    subjectTemplate: $("#f-subject").value,
-    bodyTemplate: $("#f-body").value,
+    replyTo: $("#f-replyto")?.value || undefined,
+    subjectTemplate: $("#f-subject") ? $("#f-subject").value : "",
+    bodyTemplate: $("#f-body") ? $("#f-body").value : "",
     rows: state.rows,
     scheduleMode: mode,
-    scheduledAt: mode === "datetime" ? $("#f-scheduledat").value : undefined,
-    intervalMinutes: parseInt($("#f-interval").value, 10) || 30,
-    batchSize: parseInt($("#f-batch").value, 10) || 5,
-    trackingEnabled: $("#f-tracking").checked,
+    scheduledAt: mode === "datetime" ? ($("#f-scheduledat") ? $("#f-scheduledat").value : undefined) : undefined,
+    intervalMinutes: parseInt($("#f-interval")?.value, 10) || 30,
+    batchSize: parseInt($("#f-batch")?.value, 10) || 5,
+    trackingEnabled: $("#f-tracking")?.checked || false,
     recurring: recurringFreq ? { freq: recurringFreq, until: recurringUntil || undefined } : undefined,
     attachmentIds: state.attachments.map((a) => a.id),
   };
 
-  $("#btn-create").disabled = true;
-  status.textContent = "Creating campaign…";
+  const btn = $("#btn-create");
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = "Creating campaign…";
   try {
     const r = await api("/api/campaigns", { method: "POST", body: JSON.stringify(payload) });
     toast(`Campaign created${r.sentNow ? " — sent " + r.sentNow + " now" : ""}`);
     // reset form
     state.rows = [];
     state.attachments = [];
-    $("#campaign-form").reset();
-    $("#file-info").hidden = true;
-    $("#sheet-preview").hidden = true;
+    if ($("#campaign-form")) $("#campaign-form").reset();
+    if ($("#file-info")) $("#file-info").hidden = true;
+    if ($("#sheet-preview")) $("#sheet-preview").hidden = true;
     renderAttachments();
-    state.detailId = r.campaign.id;
+    state.detailId = r.campaign ? r.campaign.id : null;
     showView("dashboard");
     loadCampaigns();
   } catch (e) {
-    status.innerHTML = `<span class="error">${e.message}</span>`;
+    if (status) status.innerHTML = `<span class="error">${e.message}</span>`;
     toast(e.message, true);
   } finally {
-    $("#btn-create").disabled = false;
+    if (btn) btn.disabled = false;
   }
 });
 
-// ----------------- campaign list -----------------
+// ============================================================
+// Campaign list
+// ============================================================
 async function loadCampaigns() {
   const wrap = $("#campaign-list");
+  if (!wrap) return;
   wrap.innerHTML = '<p class="muted">Loading…</p>';
   try {
     const r = await api("/api/campaigns");
@@ -420,7 +509,9 @@ function campCardHtml(c) {
   </div>`;
 }
 
-// ----------------- campaign detail -----------------
+// ============================================================
+// Campaign detail
+// ============================================================
 async function openDetail(id) {
   state.detailId = id;
   showView("detail");
@@ -432,7 +523,7 @@ async function openDetail(id) {
     if (!c) return;
     renderDetail(c);
     loadInsights(id);
-    if (c.campaign.status !== "active") {
+    if (c.campaign && c.campaign.status !== "active") {
       clearInterval(state.pollTimer);
       state.pollTimer = null;
     }
@@ -441,6 +532,7 @@ async function openDetail(id) {
 
 async function loadDetail() {
   const title = $("#detail-title");
+  if (!title) return;
   title.textContent = "Loading…";
   try {
     const r = await api(`/api/campaigns/${state.detailId}`);
@@ -448,7 +540,7 @@ async function loadDetail() {
     loadInsights(state.detailId);
   } catch (e) {
     title.textContent = "Error";
-    $("#detail-sub").textContent = e.message;
+    if ($("#detail-sub")) $("#detail-sub").textContent = e.message;
   }
 }
 
@@ -493,70 +585,82 @@ async function loadInsights(id) {
 
 function renderDetail(r) {
   const c = r.campaign;
-  $("#detail-title").textContent = c.name;
-  $("#detail-sub").textContent = `${c.sender_address} · ${c.schedule_mode} · batch ${c.batch_size} every ${c.interval_minutes}m`;
+  if ($("#detail-title")) $("#detail-title").textContent = c ? c.name : "";
+  if ($("#detail-sub")) $("#detail-sub").textContent = c ? `${c.sender_address} · ${c.schedule_mode} · batch ${c.batch_size} every ${c.interval_minutes}m` : "";
+
   const p = pct(c);
   const now = Math.floor(Date.now() / 1000);
   const scheduled = (r.outbox || []).filter(
     (o) => o.status === "pending" && o.send_at && o.send_at > now
   ).length;
-  $("#detail-stats").innerHTML = `
-    <div class="stat"><div class="num">${c.total_rows}</div><div class="lbl">Total</div></div>
-    <div class="stat"><div class="num" style="color:var(--ok)">${c.sent_count}</div><div class="lbl">Sent</div></div>
-    <div class="stat"><div class="num" style="color:var(--danger)">${c.failed_count}</div><div class="lbl">Failed</div></div>
-    <div class="stat"><div class="num" style="color:var(--accent)">${scheduled}</div><div class="lbl">Scheduled</div></div>
-    <div class="stat"><div class="num">${c.total_rows - c.sent_count - c.failed_count}</div><div class="lbl">Pending</div></div>`;
-  $("#btn-pause").hidden = c.status !== "active";
-  $("#btn-resume").hidden = c.status === "active";
+  if ($("#detail-stats")) {
+    $("#detail-stats").innerHTML = `
+      <div class="stat"><div class="num">${c ? c.total_rows : 0}</div><div class="lbl">Total</div></div>
+      <div class="stat"><div class="num" style="color:var(--ok)">${c ? c.sent_count : 0}</div><div class="lbl">Sent</div></div>
+      <div class="stat"><div class="num" style="color:var(--danger)">${c ? c.failed_count : 0}</div><div class="lbl">Failed</div></div>
+      <div class="stat"><div class="num" style="color:var(--accent)">${scheduled}</div><div class="lbl">Scheduled</div></div>
+      <div class="stat"><div class="num">${c ? c.total_rows - c.sent_count - c.failed_count : 0}</div><div class="lbl">Pending</div></div>`;
+  }
+  if ($("#btn-pause")) $("#btn-pause").hidden = c && c.status !== "active";
+  if ($("#btn-resume")) $("#btn-resume").hidden = c && c.status === "active";
 
   const rows = (r.outbox || []).slice(0, 200);
-  $("#detail-outbox").innerHTML = `<table>
-    <thead><tr><th>#</th><th>To</th><th>Status</th><th>Scheduled for</th><th>Sent</th><th>Resend ID</th><th>Error</th></tr></thead>
-    <tbody>${rows
-      .map(
-        (o) => `<tr>
-        <td>${o.seq}</td>
-        <td>${escapeHtml(o.to_email)}</td>
-        <td><span class="badge ${o.status}">${o.status}</span></td>
-        <td>${o.send_at ? fmtDate(o.send_at) : "—"}</td>
-        <td>${fmtDate(o.sent_at)}</td>
-        <td>${escapeHtml(o.resend_id || "")}</td>
-        <td>${escapeHtml((o.error || "").slice(0, 80))}</td>
+  if ($("#detail-outbox")) {
+    $("#detail-outbox").innerHTML = `<table>
+      <thead><tr><th>#</th><th>To</th><th>Status</th><th>Scheduled for</th><th>Sent</th><th>Resend ID</th><th>Error</th></tr></thead>
+      <tbody>${rows
+        .map(
+          (o) => `<tr>
+        <td>${o ? o.seq : "—"}</td>
+        <td>${o ? escapeHtml(o.to_email) : "—"}</td>
+        <td><span class="badge ${o ? o.status : ""}">${o ? o.status : "—"}</span></td>
+        <td>${o ? o.send_at ? fmtDate(o.send_at) : "—" : "—"}</td>
+        <td>${o ? fmtDate(o.sent_at) : "—"}</td>
+        <td>${o ? escapeHtml(o.resend_id || "") : "—"}</td>
+        <td>${o ? escapeHtml((o.error || "").slice(0, 80)) : "—"}</td>
       </tr>`
-      )
-      .join("")}</tbody></table>${
-    r.outbox.length > 200 ? `<p class="muted" style="padding:8px 12px">Showing first 200 of ${r.outbox.length} rows. Export CSV for the full report.</p>` : ""
-  }`;
+        )
+        .join("")}</tbody></table>${
+      r && r.outbox && r.outbox.length > 200 ? `<p class="muted" style="padding:8px 12px">Showing first 200 of ${r.outbox.length} rows. Export CSV for the full report.</p>` : ""
+    }`;
+  }
 }
 
 // detail controls
 $("#btn-pause").addEventListener("click", async () => {
-  await api(`/api/campaigns/${state.detailId}/pause`, { method: "POST" });
-  toast("Paused");
-  loadDetail();
+  if (state.detailId) {
+    await api(`/api/campaigns/${state.detailId}/pause`, { method: "POST" });
+    toast("Paused");
+    if (state.detailId) loadDetail();
+  }
 });
 $("#btn-resume").addEventListener("click", async () => {
-  await api(`/api/campaigns/${state.detailId}/resume`, { method: "POST" });
-  toast("Resumed");
-  openDetail(state.detailId);
+  if (state.detailId) {
+    await api(`/api/campaigns/${state.detailId}/resume`, { method: "POST" });
+    toast("Resumed");
+    openDetail(state.detailId);
+  }
 });
 $("#btn-delete").addEventListener("click", async () => {
   if (!confirm("Delete this campaign and all its outbox rows?")) return;
-  await api(`/api/campaigns/${state.detailId}`, { method: "DELETE" });
-  toast("Deleted");
-  clearInterval(state.pollTimer);
-  showView("dashboard");
-  loadCampaigns();
+  if (state.detailId) {
+    await api(`/api/campaigns/${state.detailId}`, { method: "DELETE" });
+    toast("Deleted");
+    clearInterval(state.pollTimer);
+    state.pollTimer = null;
+    showView("dashboard");
+    loadCampaigns();
+  }
 });
 $("#btn-export").addEventListener("click", () => {
-  window.location.href = `/api/campaigns/${state.detailId}/export`;
+  if (state.detailId) window.location.href = `/api/campaigns/${state.detailId}/export`;
 });
 
 // test send modal
-$("#btn-test").addEventListener("click", () => ($("#test-modal").hidden = false));
-$("#test-cancel").addEventListener("click", () => ($("#test-modal").hidden = true));
+$("#btn-test").addEventListener("click", () => { if ($("#test-modal")) $("#test-modal").hidden = false; });
+$("#test-cancel").addEventListener("click", () => { if ($("#test-modal")) $("#test-modal").hidden = true; });
 $("#test-confirm").addEventListener("click", async () => {
-  const email = $("#test-email").value.trim();
+  const email = $("#test-email") ? $("#test-email").value.trim() : "";
   if (!email) return;
   try {
     const r = await api(`/api/campaigns/${state.detailId}/test`, {
@@ -564,11 +668,14 @@ $("#test-confirm").addEventListener("click", async () => {
       body: JSON.stringify({ testEmail: email }),
     });
     toast(r.ok ? "Test sent" : "Test failed: " + (r.error || ""), !r.ok);
-    $("#test-modal").hidden = true;
+    if ($("#test-modal")) $("#test-modal").hidden = true;
   } catch (e) {
     toast(e.message, true);
   }
 });
 
-// ----------------- boot -----------------
+// ============================================================
+// Boot
+// ============================================================
 checkAuth();
+initReveal();

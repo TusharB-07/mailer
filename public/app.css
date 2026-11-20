@@ -1,7 +1,7 @@
 /* ============================================================
-   Mailer — theme matched to asterick.tech
-   Font: Geist (Vercel) with Inter / system fallback.
-   Palette: neutral shadcn grays + primary #1447e6 + brand green #244c41.
+   Mailer — asterick.tech exact UI rebuild
+   Design tokens verbatim from the specification.
+   Fonts: Geist + Geist Mono, self-hosted from /fonts/.
    ============================================================ */
 
 @font-face {
@@ -11,611 +11,552 @@
   font-display: swap;
 }
 
-:root {
-  --font: "Geist", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-
-  /* light theme (default) */
-  --bg: #fafafa;
-  --fg: #171717;
-  --muted: #737373;
-  --card: #ffffff;
-  --border: #e5e5e5;
-  --input: #ffffff;
-  --hover: #f5f5f5;
-  --primary: #1447e6;
-  --primary-fg: #ffffff;
-  --primary-hover: #1d3fb8;
-  --brand: #244c41;
-  --accent: #3078f8;
-  --danger: #e40014;
-  --danger-fg: #ffffff;
-  --ok: #16a34a;
-  --warn: #f99c00;
-  --radius: 0.5rem;
-  --radius-sm: 0.375rem;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.08);
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
 }
+
+/* Fallback: download Geist Mono from CDN if missing */
+@font-face {
+  font-family: "Geist Mono";
+  src: url(https://cdn.jsdelivr.net/npm/geist@1/dist/fonts/geist-mono/GeistMono-Variable.woff2) format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------
+   Design tokens — LIGHT (default, no data-theme, or data-theme="light")
+   ------------------------------------------------------------ */
+
+:root {
+  --radius: 0.375rem;            /* 6px — all radii derive from this */
+
+  --radius-sm: 2px;              /* 2px — icon chips, nav links */
+  --radius-md: 4px;              /* 4px — buttons, cards, badges */
+  --radius-lg: 6px;              /* 6px — contact panels, CTA */
+  --radius-xl: 10px;             /* 10px */
+
+  --radius-pill: 999px;          /* pills — no 16px+ bubbles */
+
+  --brand: #2e6ff2;              /* ⭐ the only accent hue (light) */
+  --brand-foreground: #ffffff;
+
+  --background: #ffffff;         /* #fff */
+  --foreground: #0a0a0a;         /* ≈ #0a0a0a */
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+
+  --primary: #171717;            /* ≈ #171717 — "black" buttons */
+  --primary-foreground: #fafafa;
+
+  --secondary: #f5f5f5;          /* ≈ #f5f5f5 */
+  --secondary-foreground: #202020;
+
+  --muted: #f5f5f5;              /* same as secondary in light */
+  --muted-foreground: #737373;   /* ≈ #737373 */
+
+  --accent: oklch(0.97 0 0);       /* fallback for any accent usage */
+  --accent-foreground: #202020;
+
+  --border: #e5e5e5;             /* ≈ #e5e5e5 hairlines */
+  --input: #e5e5e5;
+  --ring: #a3a3a3;               /* ≈ #a3a3a3 */
+
+  --destructive: #ef4444;        /* red */
+  --danger: var(--destructive);
+
+  --ok: #16a34a;                 /* restrained green */
+}
+
+/* ------------------------------------------------------------
+   Design tokens — DARK (JS sets data-theme="dark" on <html>)
+   ------------------------------------------------------------ */
 
 [data-theme="dark"] {
-  --bg: #0a0a0a;
-  --fg: #fafafa;
-  --muted: #a1a1a1;
+  --brand: #4a86f8;              /* ⭐ brighter blue for dark bg */
+  --brand-foreground: #ffffff;
+
+  --background: #0e0e0e;         /* near-black */
+  --foreground: #fafafa;
   --card: #171717;
-  --border: #262626;
-  --input: #171717;
-  --hover: #1f1f1f;
-  --primary: #2563eb;
-  --primary-fg: #ffffff;
-  --primary-hover: #3b82f6;
-  --brand: #3d8b7a;
-  --accent: #60a5fa;
-  --danger: #ef4444;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --card-foreground: #fafafa;
+
+  --primary: #e5e5e5;            /* light buttons on dark */
+  --primary-foreground: #171717;
+
+  --secondary: #242424;
+  --secondary-foreground: #fafafa;
+
+  --muted: #242424;
+  --muted-foreground: #a3a3a3;   /* ≈ #a3a3a3 */
+
+  --accent: oklch(0.24 0 0);
+  --accent-foreground: #fafafa;
+
+  --border: rgba(255,255,255,0.12); /* translucent white — key for dark hairlines */
+  --input: rgba(255,255,255,0.16);
+  --ring: #a3a3a3;
+
+  --destructive: #f472b6;
+  --danger: var(--destructive);
+
+  --ok: #22c55e;
 }
 
-* {
-  box-sizing: border-box;
+/* ------------------------------------------------------------
+   Base + selectors
+   ------------------------------------------------------------ */
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { scroll-behavior: smooth; }
+  body { @apply bg-background text-foreground antialiased; }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  ::selection { background-color: var(--brand); color: var(--brand-foreground); }
 }
-html,
-body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-}
-body {
-  font-family: var(--font);
-  background: var(--bg);
-  color: var(--fg);
-  font-size: 14px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-a {
-  color: var(--primary);
-  text-decoration: none;
-}
-code {
-  font-family: var(--mono);
-  background: var(--hover);
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-.muted {
-  color: var(--muted);
-}
-.error {
-  color: var(--danger);
-}
-.hidden {
-  display: none !important;
+@layer utilities {
+  .text-balance { text-wrap: balance; }
 }
 
-/* ---------- buttons ---------- */
+/* ------------------------------------------------------------
+   Reduced motion — disable all transitions/animations
+   ------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *,
+  *::before,
+  *::after {
+    @apply transition-none duration-300 ease-in-out !important;
+    animation-name: none !important;
+    animation-timeline: normal !important;
+  }
+  .reveal * { @apply transition-none; }
+  .accordion-content { @apply animate-none; }
+}
+
+/* ------------------------------------------------------------
+   Brand gradient (asterisk stroke)
+   ------------------------------------------------------------ */
+
+.brand-gradient {
+  background: linear-gradient(
+    to bottom right,
+    #e3ecff 0%,     /* pale blue-white */
+    #9dbaff 45%,    /* medium blue */
+    #3078f8 100%     /* electric blue */
+  );
+}
+
+/* ------------------------------------------------------------
+   Helper classes used throughout
+   ------------------------------------------------------------ */
+
+.text-brand { color: var(--brand) !important; }
+.text-brand-foreground { color: var(--brand-foreground) !important; }
+.text-foreground { color: var(--foreground) !important; }
+.text-muted-foreground { color: var(--muted-foreground) !important; }
+.text-primary { color: var(--primary) !important; }
+.text-primary-foreground { color: var(--primary-foreground) !important; }
+.bg-brand { background-color: var(--brand) !important; }
+.bg-brand-foreground { background-color: var(--brand-foreground) !important; }
+.bg-background { background-color: var(--background) !important; }
+.bg-card { background-color: var(--card) !important; }
+.bg-secondary { background-color: var(--secondary) !important; }
+.bg-muted { background-color: var(--muted) !important; }
+.border-brand { border-color: var(--brand) !important; }
+.border-muted { border-color: var(--border) !important; }
+.ring-ring { box-shadow: 0 0 0 3px var(--ring) !important; }
+
+/* ============================================================
+   Radius utilities
+   ============================================================ */
+
+/* .rounded-sm: 2px, .rounded-md: 4px, .rounded-lg: 6px, .rounded-xl: 10px */
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-xl { border-radius: var(--radius-xl); }
+.rounded-pill { border-radius: var(--radius-pill); }
+
+/* ============================================================
+   Buttons (exact spec: rounded-md 4px, h-9 px-4, font-mono text-sm)
+   ------------------------------------------------------------ */
+
+/* Base button */
 .btn {
-  font: inherit;
-  font-weight: 500;
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--fg);
+  @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4;
+  font-family: var(--mono);
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, transform 0.05s;
 }
-.btn:hover {
-  background: var(--hover);
+
+/* Default variant: bg-primary (black light / white dark) */
+.btn.default,
+.btn:not(.outline):not(.ghost):not(.brand) {
+  @apply bg-primary text-primary-foreground;
 }
-.btn:active {
-  transform: translateY(1px);
+.btn.default:hover {
+  @apply bg-primary/90;
 }
-.btn.primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-fg);
+
+/* Outline variant */
+.btn.outline {
+  @apply border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50;
 }
-.btn.primary:hover {
-  background: var(--primary-hover);
-  border-color: var(--primary-hover);
-}
-.btn.danger {
-  background: var(--danger);
-  border-color: var(--danger);
-  color: var(--danger-fg);
-}
+
+/* Ghost variant */
 .btn.ghost {
-  background: transparent;
-  border-color: transparent;
-}
-.btn.ghost:hover {
-  background: var(--hover);
+  @apply hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50;
 }
 
-/* ---------- cards ---------- */
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
-  box-shadow: var(--shadow);
-}
-.card h2 {
-  margin: 0 0 4px;
-  font-size: 15px;
-  font-weight: 600;
+/* BRAND blue — reserved ONLY for "Create campaign" CTA */
+.btn.brand {
+  @apply bg-brand text-brand-foreground hover:bg-brand/90;
 }
 
-/* ---------- login ---------- */
-.login-wrap {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: radial-gradient(120% 80% at 50% 0%, rgba(48, 120, 248, 0.08), transparent 60%),
-    var(--bg);
+/* Sizes */
+.btn.sm { @apply h-8 px-3; }
+.btn.lg { @apply h-10 px-6; }
+.btn.icon { width: 2.25rem; height: 2.25rem; padding: 0; }
+
+/* ============================================================
+   Badges
+   ============================================================ */
+
+.badge {
+  @apply inline-flex rounded-md border px-2 py-0.5 text-xs font-medium align-middle gap-1 uppercase tracking-widest;
 }
-.login-card {
-  width: 100%;
-  max-width: 380px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.login-card h1 {
-  margin: 8px 0 0;
-  font-size: 22px;
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-}
-.brand-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  background: linear-gradient(135deg, var(--brand), var(--accent));
-}
-.brand-name {
-  font-size: 15px;
-}
-.brand-sub {
-  font-size: 11px;
-  color: var(--muted);
-  margin-left: 2px;
+.badge.variant-outline {
+  @apply border bg-transparent text-muted-foreground;
 }
 
-/* ---------- app shell ---------- */
-.app {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  min-height: 100vh;
-}
-.sidebar {
-  background: var(--card);
-  border-right: 1px solid var(--border);
-  padding: 18px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-}
-.sidebar .brand {
-  padding: 4px 6px;
-}
-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.nav-item {
-  text-align: left;
-  background: transparent;
+/* Status badges keep small semantic tint */
+.badge.status-pending { @apply text-muted-foreground; }
+.badge.status-sent { @apply text-ok; }
+.badge.status-failed { @apply text-danger; }
+.badge.status-paused { @apply text-warning; }
+.badge.status-active { @apply text-primary; }
+
+/* ============================================================
+   Accordion (FAQ)
+   ============================================================ */
+
+.accordion {
   border: none;
-  color: var(--muted);
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font: inherit;
+  border-radius: 0;
 }
-.nav-item:hover {
-  background: var(--hover);
-  color: var(--fg);
+.accordion-item {
+  border-b: 1px solid var(--border);
+  border-radius: 0;
 }
-.nav-item.active {
-  background: var(--hover);
-  color: var(--fg);
-  font-weight: 500;
+.accordion-item:last-child { border-b-width: 0; }
+.accordion-trigger {
+  @apply flex flex-1 items-start justify-between gap-4 py-4 text-left text-sm font-medium hover:text-brand transition-colors;
+  color: var(--foreground);
 }
-.sidebar-foot {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.accordion-trigger:hover { @apply hover:text-brand; }
+.accordion-trigger[data-state=open] { @apply hover:text-brand; }
+.accordion-content {
+  @apply animate-accordion-down overflow-hidden pt-0 pb-4 text-sm leading-relaxed text-muted-foreground;
+}
+.accordion-content[data-state=closed] { @apply animate-accordion-up; }
+.accordion-icon {
+  @apply size-4 translate-y-0.5 text-muted-foreground transition-transform duration-200;
+}
+.accordion-trigger[data-state=open] > .accordion-icon { @apply rotate-180; }
+
+/* ============================================================
+   Sheet (mobile nav drawer)
+   ============================================================ */
+
+.sheet {
+  @apply fixed z-50 inset-y-0 right-0 h-full w-72 sm:max-w-sm bg-background border-l w-3/4 sm:max-w-sm shadow-lg transition ease-in-out data-[state=open]:slide-in-from-right data-[state=open]:duration-500 data-[state=closed]:slide-out-to-right data-[state=closed]:duration-300;
+}
+.sheet-overlay {
+  @apply fixed inset-0 z-50 bg-black/50 fade-in/out;
+}
+.sheet-close {
+  @apply absolute top-4 right-4 opacity-70 hover:opacity-100;
 }
 
-/* ---------- content ---------- */
-.content {
-  padding: 28px 32px 64px;
-  max-width: 1200px;
+/* ============================================================
+   Header (fixed, scrolled blur)
+   ============================================================ */
+
+.header {
+  @apply fixed inset-x-0 top-0 z-50 border-b transition-colors duration-300
+    scrolled:border-border scrolled:bg-background/85 scrolled:backdrop-blur-md
+    scrolled:pt-0 top-0 scrolled:border-transparent scrolled:bg-transparent;
+  @apply h-16 max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6;
 }
-.page-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 22px;
+.header .logo {
+  @apply group inline-flex items-center gap-3;
 }
-.page-head h1 {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 600;
+.header .logo-mark {
+  @apply size-7 transition-transform duration-300 group-hover:rotate-90;
 }
-.page-head .muted {
-  margin: 4px 0 0;
+.header .logo-text {
+  @apply flex flex-col leading-none;
+  .name { @apply text-sm font-bold uppercase tracking-[0.22em] text-foreground; }
+  .tag { @apply mt-1.5 text-[9px] font-light tracking-[0.24em] text-muted-foreground; }
+}
+.header .nav {
+  @apply hidden md:flex gap-1;
+}
+.header .nav-link {
+  @apply text-sm text-muted-foreground rounded-sm px-3 py-2 hover:text-foreground transition-colors;
+}
+.header .hamburger {
+  @apply size-5 cursor-pointer opacity-70 hover:opacity-100;
+}
+.header .cta {
+  @apply hidden sm:inline-flex ml-1 font-mono text-xs;
 }
 
-/* ---------- forms ---------- */
+/* ============================================================
+   Footer
+   ============================================================ */
+
+.footer {
+  @apply border-t bg-muted/40;
+}
+.footer .container {
+  @apply py-12 md:grid-cols-[2fr_1fr_1fr] gap-10;
+}
+.footer .logo-text {
+  @apply mt-4 max-w-sm text-sm text-muted-foreground;
+}
+.footer .col h2 {
+  @apply font-mono text-xs uppercase tracking-widest text-muted-foreground;
+}
+.footer .col ul {
+  @apply text-sm text-muted-foreground transition-colors hover:text-foreground space-y-2.5;
+}
+.footer .col .links { @apply space-y-2.5; }
+.footer .bottom {
+  @apply mt-12 flex border-t pt-6 flex-col gap-3 sm:flex-row sm:justify-between;
+  @apply font-mono text-xs text-muted-foreground;
+}
+.footer .bottom .left { @apply order-2 sm:order-1; }
+.footer .bottom .right { @apply order-1 sm:order-2 text-right; }
+
+/* ============================================================
+   Section base
+   ============================================================ */
+
+.section {
+  @apply py-20 sm:py-28;
+}
+.section .container {
+  @apply mx-auto max-w-6xl px-4 sm:px-6;
+}
+
+/* Stats strip (hero bottom) */
+
+.stats {
+  @apply border-y bg-muted/30;
+}
+.stats .grid {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 lg:divide-y-0 sm:divide-x gap-2 px-6 py-8;
+}
+.stat {
+  @apply flex flex-col gap-1;
+}
+.stat .value { @apply text-3xl font-semibold tracking-tight; }
+.stat .label { @apply ml-2 font-mono text-xs uppercase tracking-widest text-brand; }
+.stat .detail { @apply text-sm leading-relaxed text-muted-foreground; }
+
+/* ============================================================
+   Capability chips (hero)
+   ============================================================ */
+
+.chip {
+  @apply rounded-full border bg-background/60 px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-muted-foreground backdrop-blur-sm;
+}
+.chip:hover { @apply hover:bg-muted/50 hover:text-foreground; }
+
+/* ============================================================
+   Card (generic) — used throughout dashboard
+   ============================================================ */
+
+.card {
+  @apply rounded-md border bg-card border-border p-6 transition-colors hover:border-brand/60 hover:bg-muted/50;
+}
+.card h2 { @apply mb-2 font-semibold leading-snug tracking-tight; }
+.card h3 { @apply text-base font-semibold leading-snug tracking-tight; }
+
+/* ============================================================
+   Form basics
+   ============================================================ */
+
 .field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
+  @apply flex flex-col gap-2 mb-4;
 }
 .field > span {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
+  @apply text-sm font-medium text-muted-foreground;
 }
 input,
 select,
 textarea {
-  font: inherit;
-  width: 100%;
-  padding: 9px 11px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--input);
-  color: var(--fg);
-  outline: none;
+  @apply font-none w-full px-2.5 py-2 border border-border rounded-md bg-input text-foreground placeholder-muted-foreground focus:border-brand focus:outline-none focus:ring-2 focus:ring-ring/50 focus:ring-offset-2 transition-colors;
+  font-family: inherit;
+  font-size: 14px;
+}
+textarea {
+  @apply font-mono resize-v;
 }
 input:focus,
 select:focus,
-textarea:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(20, 71, 230, 0.12);
-}
-textarea {
-  resize: vertical;
-  font-family: var(--mono);
-  font-size: 12.5px;
-}
-.check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-.check input {
-  width: auto;
-}
+textarea:focus { @apply border-brand; }
 
-/* ---------- segmented control ---------- */
-.seg {
-  display: inline-flex;
-  background: var(--hover);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 3px;
-  gap: 2px;
-  margin-bottom: 14px;
-}
-.seg-btn {
-  font: inherit;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  padding: 6px 12px;
-  border-radius: calc(var(--radius-sm) - 2px);
-  cursor: pointer;
-}
-.seg-btn.active {
-  background: var(--card);
-  color: var(--fg);
-  box-shadow: var(--shadow);
-}
+/* ============================================================
+   Dropzone
+   ============================================================ */
 
-/* ---------- dropzone ---------- */
 .drop {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  border: 1.5px dashed var(--border);
-  border-radius: var(--radius);
-  padding: 28px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  @apply flex flex-col items-center gap-4 border-2 dashed border-border rounded-lg px-6 py-8 text-center cursor-pointer transition-colors;
 }
 .drop:hover,
-.drop.drag {
-  border-color: var(--primary);
-  background: rgba(20, 71, 230, 0.04);
-}
+.drop.drag { @apply border-brand bg-brand/10; }
 .file-info {
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: var(--hover);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
+  @apply mt-2 px-3 py-2 rounded-sm text-sm bg-muted/50 text-foreground;
 }
 
-/* ---------- layout helpers ---------- */
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  align-items: start;
-}
-.span-2 {
-  grid-column: 1 / -1;
-}
-.row {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-.row.gap {
-  gap: 8px;
-}
-.row.end {
-  justify-content: flex-end;
-}
-.recur {
-  margin-top: 8px;
-}
-.recur summary {
-  cursor: pointer;
-  font-weight: 500;
-  padding: 8px 0;
-}
-.submit-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
+/* ============================================================
+   Layout helpers
+   ============================================================ */
 
-/* ---------- tables ---------- */
+.grid { @apply grid gap-6; }
+.grid-cols-2 { @apply grid-cols-1 sm:grid-cols-2; }
+.grid-cols-3 { @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-3; }
+.grid-cols-4 { @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-4; }
+
+.gap-4 { gap: 1rem; }
+.gap-6 { gap: 1.5rem; }
+.gap-8 { gap: 2rem; }
+
+.row { @apply flex items-center gap-4; }
+.row.end { @apply justify-flex-end; }
+
+/* ============================================================
+   Tables
+   ============================================================ */
+
 .table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  margin-top: 12px;
+  @apply overflow-x-auto border border-border rounded-md bg-card p-4 mb-4;
 }
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-th,
-td {
-  text-align: left;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-th {
-  background: var(--hover);
-  font-weight: 500;
-  color: var(--muted);
-  font-size: 12px;
-  text-transform: none;
-}
-tbody tr:last-child td {
-  border-bottom: none;
-}
-tbody tr:hover {
-  background: var(--hover);
-}
+table { @apply w-full border-collapse collapse font-none; }
+th, td { @apply text-left py-2 border-b border-border whitespace-nowrap; }
+th { @apply font-medium text-xs uppercase tracking-widest text-muted-foreground bg-hover; }
+tbody tr:hover { @apply bg-muted/50; }
 
-/* ---------- campaign list cards ---------- */
-.campaign-list {
-  display: grid;
-  gap: 12px;
-}
+/* ============================================================
+   Campaign list cards
+   ============================================================ */
+
+.camp-list { @apply grid gap-4; }
 .camp-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 18px;
+  @apply flex items-center justify-between gap-4 p-4 rounded-md border bg-card border-border transition-colors hover:-translate-y-0.5 hover:border-brand/60 hover:shadow-sm;
 }
-.camp-title {
-  font-weight: 600;
-  margin: 0 0 2px;
+.camp-title { @apply font-medium; }
+.camp-meta { @apply text-sm text-muted-foreground; }
+
+/* ============================================================
+   Asterisk mark (inline accent, logo, favicon, watermark)
+   ============================================================ */
+
+.asterisk-mark {
+  @apply size-5 inline-block;
 }
-.camp-meta {
-  font-size: 12px;
-  color: var(--muted);
+.asterisk-mark path { @apply stroke-current; }
+
+/* Logo lockup: gradient asterisk | hairline divider | "MAILER" over "Reliability by Design." */
+.logo-wrapper {
+  @apply inline-flex items-center gap-3;
 }
-.badge {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  text-transform: capitalize;
+.logo-wrapper .asterisk-mark { @apply size-7; }
+.logo-wrapper .hairline { @apply h-1 w-px bg-border; }
+.logo-wrapper .text-small { @apply text-[9px] font-light tracking-[0.24em] text-muted-foreground; }
+.logo-wrapper .text-bold { @apply text-sm font-bold uppercase tracking-[0.22em] text-foreground; }
+
+/* ============================================================
+   Hover behaviors dictionary
+   ============================================================ */
+
+/* Linked card hover */
+.card-link:hover { @apply -translate-y-0.5 border-brand/60 shadow-sm transition-all duration-300; }
+
+/* Icon chip hover */
+.chip-wrapper:hover { @apply border-brand/40 text-brand transition-colors; }
+
+/* Asterisk rotate on logo hover */
+.logo-wrapper:hover .asterisk-mark { @apply rotate-90 transition-transform duration-300; }
+
+/* Step number hover (process/why-us) */
+.step-number { @apply font-mono text-4xl font-semibold tracking-tight text-border transition-colors group-hover:text-brand/40; }
+
+/* Scroll cue button */
+.scroll-cue { @apply rounded-full border border-brand hover:text-brand transition-colors; }
+
+/* ============================================================
+   Hero-specific: dotted grid backdrop + watermark
+   ============================================================ */
+
+.hero-dots {
+  @apply pointer-events-none absolute inset-0
+    [background-image:radial-gradient(var(--border)_1px,transparent_1px)]
+    [background-size:28px_28px]
+    [mask-image:radial-gradient(ellipse_70%_60%_at_50%_35%,black,transparent)];
 }
-.badge.active {
-  background: rgba(22, 163, 74, 0.12);
-  color: var(--ok);
-  border-color: transparent;
-}
-.badge.paused {
-  background: rgba(249, 156, 0, 0.15);
-  color: var(--warn);
-  border-color: transparent;
-}
-.badge.completed {
-  background: var(--hover);
-  color: var(--muted);
-  border-color: transparent;
-}
-.badge.failed {
-  background: rgba(228, 0, 20, 0.12);
-  color: var(--danger);
-  border-color: transparent;
-}
-.progress {
-  height: 6px;
-  background: var(--hover);
-  border-radius: 3px;
-  overflow: hidden;
-  width: 180px;
-  margin-top: 6px;
-}
-.progress > span {
-  display: block;
-  height: 100%;
-  background: var(--primary);
+.hero-watermark {
+  @apply absolute -right-24 top-24 hidden size-[26rem] rotate-12 text-brand/[0.06] lg:block dark:text-brand/[0.05];
 }
 
-/* ---------- stats ---------- */
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
+/* ============================================================
+   Contact panel (inverted theme) — PREVIEW modal
+   ============================================================ */
+
+.contact-panel {
+  @apply overflow-hidden rounded-lg border bg-foreground text-background;
 }
-.stat {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-}
-.stat .num {
-  font-size: 24px;
-  font-weight: 700;
-}
-.stat .lbl {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 2px;
+.contact-panel .label { @apply text-background/60; }
+.contact-panel .fine-print { @apply text-background/40; }
+.contact-panel .border-subtle { @apply border-background/10; }
+.contact-panel .fill-subtle { @apply bg-background/[0.03]; }
+
+/* ============================================================
+   Progress bar
+   ============================================================ */
+
+.progress { @apply h-6 bg-border rounded-full overflow-hidden; }
+.progress > span { @apply h-full bg-brand; transition-width 300ms ease-out; }
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+
+@media (max-width: 860px) {
+  .header .nav { @apply flex-col gap-2 absolute top-14 left-0 w-full bg-card border-t px-4 py-6; }
+  .header .cta { @apply sm:inline-flex ml-2; }
+  .grid, .stats { @apply grid-cols-1; }
+  .section { @apply py-16 sm:py-24; }
 }
 
-/* ---------- insights ---------- */
-.insights {
-  margin-bottom: 18px;
-}
-.insights h2 {
-  margin-bottom: 2px;
-}
-.insights-stats {
-  margin: 14px 0 0;
-}
+/* ============================================================
+   Modal styles
+   ============================================================ */
 
-/* ---------- attachments ---------- */
-.attach-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 10px;
-}
-.attach-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: var(--hover);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-}
-
-/* ---------- modal ---------- */
 .modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: grid;
-  place-items: center;
-  z-index: 50;
-  padding: 24px;
+  @apply fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4;
 }
 .modal-card {
-  width: 100%;
-  max-width: 420px;
-  box-shadow: var(--shadow-lg);
+  @apply w-full max-w-2xl rounded-md border bg-card border-bg p-6 shadow-lg;
 }
-.modal-card.wide {
-  max-width: 720px;
+.modal-card.wide { @apply max-w-720; }
+.modal .close {
+  @apply absolute top-4 right-4 rounded-md border bg-background/15 p-2 hover:bg-background/25;
 }
-.preview-sub {
-  font-weight: 600;
-  padding: 10px 12px;
-  background: var(--hover);
-  border-radius: var(--radius-sm);
-  margin-bottom: 10px;
-}
-.preview-frame {
-  width: 100%;
-  height: 360px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: #fff;
-}
-
-/* ---------- toast ---------- */
-.toast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--fg);
-  color: var(--bg);
-  padding: 10px 18px;
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-lg);
-  z-index: 100;
-  font-size: 13px;
-}
-.toast.error {
-  background: var(--danger);
-  color: #fff;
-}
-
-/* ---------- responsive ---------- */
-@media (max-width: 860px) {
-  .app {
-    grid-template-columns: 1fr;
-  }
-  .sidebar {
-    position: static;
-    height: auto;
-    flex-direction: row;
-    align-items: center;
-    overflow-x: auto;
-  }
-  nav {
-    flex-direction: row;
-  }
-  .sidebar-foot {
-    margin-top: 0;
-    margin-left: auto;
-    flex-direction: row;
-  }
-  .grid,
-  .stats {
-    grid-template-columns: 1fr;
-  }
-  .content {
-    padding: 20px 16px 48px;
-  }
-}
+.preview-modal .modal-card { @apply rounded-lg border bg-foreground text-background; }
+.preview-modal .close { @apply text-brand; }

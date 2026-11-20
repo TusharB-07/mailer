@@ -20,7 +20,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "mailflare"
-database_id = "REPLACE_WITH_YOUR_MAILFLARE_D1_ID"
+database_id = "61333b2b-a599-46f3-821a-60795f8d4ead"
 
 # ------------------------------------------------------------------
 # R2: attachment storage. Create it once with:
@@ -49,6 +49,8 @@ DEFAULT_INTERVAL_MINUTES = "30"
 RESEND_BATCH_MAX = "100"
 RESEND_API_BASE = "https://api.resend.com"
 SESSION_TTL_HOURS = "168"
+
+
 
 # ------------------------------------------------------------------
 # Secrets — set with wrangler (never commit these):

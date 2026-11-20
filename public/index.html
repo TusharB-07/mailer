@@ -1,46 +1,60 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light" class="antialiased">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mailer — asterick.tech</title>
     <meta name="robots" content="noindex" />
     <link rel="stylesheet" href="/app.css" />
-    <!-- Geist is self-hosted (/fonts); Inter is a Google Fonts fallback. -->
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-    />
-    <!-- SheetJS: parses the Excel file entirely in the browser. -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Self-hosted Geist + Geist Mono from /fonts/ -->
+    <link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin>
+    <!-- Fallback: download Geist Mono from CDN if /fonts/ missing -->
+    <script>
+      // <![CDATA[
+      !window.FontFace ||
+      new FontFace('Geist Mono', 'url(/fonts/GeistMono-Variable.woff2) format("woff2")').load().then(() => {
+        const s = document.createElement('style');
+        s.textContent = '@font-face {font-family:"Geist Mono";src:url(https://cdn.jsdelivr.net/npm/geist@1/dist/fonts/geist-mono/GeistMono-Variable.woff2) format("woff2");}';
+        document.head.appendChild(s);
+      });
+      //]]>
+    </script>
   </head>
   <body>
     <!-- ===================== LOGIN ===================== -->
-    <main id="login-view" class="login-wrap" hidden>
+    <!-- Renders in HTML even if JS is slow; shows dotted-grid backdrop + watermark -->
+    <main id="login-view" class="login-wrap">
+      <!-- Dotted-grid backdrop (1px dots, 28px spacing, elliptical mask) -->
+      <div class="hero-dots" aria-hidden="true"></div>
+      <!-- Giant 6%-opacity asterisk watermark (rotate-12, desktop only) -->
+      <span class="hero-watermark asterisk-mark"></span>
       <form id="login-form" class="card login-card">
         <div class="brand">
-          <span class="brand-dot"></span>
+          <span class="asterisk-mark" style="margin-right: 6px; vertical-align: middle;"></span>
           <span class="brand-name">Mailer</span>
         </div>
         <h1>Sign in</h1>
         <p class="muted">Enter your admin password to continue.</p>
         <label class="field">
-          <span>Password</span>
+          <span class="font-mono text-xs uppercase tracking-widest text-muted-foreground">PASSWORD</span>
           <input type="password" id="login-password" autocomplete="current-password" required />
         </label>
-        <button class="btn primary" type="submit">Sign in</button>
+        <button class="btn brand" type="submit">Create campaign</button>
         <p id="login-error" class="error" hidden></p>
       </form>
     </main>
 
-    <!-- ===================== APP ===================== -->
+    <!-- ===================== APP SHELL ===================== -->
     <div id="app-view" class="app" hidden>
       <aside class="sidebar">
-        <div class="brand">
-          <span class="brand-dot"></span>
-          <span class="brand-name">Mailer</span>
-          <span class="brand-sub">asterick.tech</span>
+        <div class="logo-wrapper">
+          <svg class="asterisk-mark" viewBox="0 0 24 24" fill="none" stroke="current" stroke-width="2.8" stroke-linecap="round"><path d="M12 2.5v19M3.9 7.25l16.2 9.5M20.1 7.25l-16.2 9.5"></path></svg>
+          <span class="logo-text">
+            <span class="text-bold">Mailer</span>
+            <span class="text-small">Reliability by Design.</span>
+          </span>
+          <span class="hairline"></span>
         </div>
         <nav>
           <button class="nav-item active" data-view="dashboard">Campaigns</button>
@@ -60,7 +74,7 @@
               <h1>Campaigns</h1>
               <p class="muted">Bulk + scheduled sending via Resend.</p>
             </div>
-            <button class="btn primary" data-view="new">+ New campaign</button>
+            <button class="btn brand" data-view="new">+ New campaign</button>
           </header>
           <div id="campaign-list" class="campaign-list">
             <p class="muted">Loading…</p>
@@ -80,10 +94,10 @@
           <form id="campaign-form" class="grid">
             <!-- 1. Excel upload -->
             <div class="card span-2">
-              <h2>1 · Recipients</h2>
+              <h2 class="ebrow">01 Recipients</h2>
               <p class="muted">
                 Excel with columns <code>Email</code>, <code>Subject</code>, <code>Body</code>.
-                Any extra columns become merge tags (e.g. <code>Name</code> → <code>&#123;&#123;Name&#125;&#125;</code>).
+                Any extra columns become merge tags (e.g. <code>Name</code> → <code>{{Name}}</code>).
                 Optional <code>SendAt</code> column overrides per-row timing.
               </p>
               <label class="drop" id="dropzone">
@@ -97,7 +111,7 @@
 
             <!-- 2. Sender + content -->
             <div class="card">
-              <h2>2 · Sender &amp; content</h2>
+              <h2>2 · Sender & content</h2>
               <label class="field">
                 <span>Campaign name</span>
                 <input id="f-name" placeholder="November outreach" required />
@@ -127,9 +141,12 @@
               <h2>3 · Schedule</h2>
               <div class="seg" id="schedule-mode">
                 <button type="button" class="seg-btn active" data-mode="now">Send now</button>
-                <button type="button" class="seg-btn" data-mode="datetime">Pick date &amp; time</button>
+                <button type="button" class="seg-btn" data-mode="datetime">Pick date & time</button>
                 <button type="button" class="seg-btn" data-mode="interval">Interval drip</button>
               </div>
+              <p class="muted text-xs uppercase tracking-widest blocked:block mt-2" id="interval-helper">
+                Applies to batches after the first. <span class="font-mono" id="interval-note">'Send now' sends batch 1 immediately.</span>
+              </p>
               <label class="field" id="field-datetime" hidden>
                 <span>Send at</span>
                 <input id="f-scheduledat" type="datetime-local" />
@@ -144,7 +161,7 @@
               </label>
               <label class="check">
                 <input id="f-tracking" type="checkbox" checked />
-                <span>Open &amp; click tracking</span>
+                <span>Open & click tracking</span>
               </label>
               <details class="recur">
                 <summary>Recurring campaign</summary>
@@ -177,7 +194,7 @@
             <!-- 5. Submit -->
             <div class="card span-2 submit-bar">
               <div id="create-status" class="muted"></div>
-              <button type="submit" class="btn primary" id="btn-create">Create campaign</button>
+              <button type="submit" class="btn brand" id="btn-create">Create campaign</button>
             </div>
           </form>
         </div>
@@ -218,24 +235,24 @@
         <h2>Send a test</h2>
         <p class="muted">Sends the first row's rendered email to the address below.</p>
         <label class="field">
-          <span>Test recipient</span>
+          <span class="font-mono text-xs uppercase tracking-widest text-muted-foreground">Test recipient</span>
           <input id="test-email" type="email" placeholder="you@asterick.tech" />
         </label>
         <div class="row gap end">
           <button id="test-cancel" class="btn ghost">Cancel</button>
-          <button id="test-confirm" class="btn primary">Send test</button>
+          <button id="test-confirm" class="btn brand">Send test</button>
         </div>
       </div>
     </div>
 
     <!-- preview modal -->
     <div id="preview-modal" class="modal" hidden>
-      <div class="card modal-card wide">
+      <div class="card modal-card wide preview-modal">
         <h2>Preview</h2>
-        <div id="preview-subject" class="preview-sub"></div>
+        <div id="preview-subject" class="preview-subject"></div>
         <iframe id="preview-frame" class="preview-frame"></iframe>
         <div class="row gap end">
-          <button id="preview-close" class="btn ghost">Close</button>
+          <button id="preview-close" class="btn brand close">Close</button>
         </div>
       </div>
     </div>
@@ -243,6 +260,11 @@
     <!-- toast -->
     <div id="toast" class="toast" hidden></div>
 
+    <noscript>
+      <p style="text-align:center;padding:16px;color:#b91c1c">
+        JavaScript is required to sign in to Mailer.
+      </p>
+    </noscript>
     <script src="/app.js"></script>
   </body>
 </html>

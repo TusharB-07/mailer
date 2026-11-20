@@ -1,60 +1,67 @@
 <!doctype html>
-<html lang="en" data-theme="light" class="antialiased">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mailer — asterick.tech</title>
     <meta name="robots" content="noindex" />
     <link rel="stylesheet" href="/app.css" />
-    <!-- Self-hosted Geist + Geist Mono from /fonts/ -->
-    <link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="/fonts/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin>
-    <!-- Fallback: download Geist Mono from CDN if /fonts/ missing -->
-    <script>
-      // <![CDATA[
-      !window.FontFace ||
-      new FontFace('Geist Mono', 'url(/fonts/GeistMono-Variable.woff2) format("woff2")').load().then(() => {
-        const s = document.createElement('style');
-        s.textContent = '@font-face {font-family:"Geist Mono";src:url(https://cdn.jsdelivr.net/npm/geist@1/dist/fonts/geist-mono/GeistMono-Variable.woff2) format("woff2");}';
-        document.head.appendChild(s);
-      });
-      //]]>
-    </script>
+    <link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- SVG defs: brand gradient for the asterisk mark -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <defs>
+        <linearGradient id="asterisk-grad" x1="17" y1="3" x2="7" y2="21" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#e3ecff" />
+          <stop offset="0.45" stop-color="#9dbaff" />
+          <stop offset="1" stop-color="#3078f8" />
+        </linearGradient>
+      </defs>
+    </svg>
+    <!-- SheetJS: parses the Excel file entirely in the browser. async so a slow CDN never blocks login. -->
+    <script async src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   </head>
   <body>
     <!-- ===================== LOGIN ===================== -->
-    <!-- Renders in HTML even if JS is slow; shows dotted-grid backdrop + watermark -->
     <main id="login-view" class="login-wrap">
-      <!-- Dotted-grid backdrop (1px dots, 28px spacing, elliptical mask) -->
       <div class="hero-dots" aria-hidden="true"></div>
-      <!-- Giant 6%-opacity asterisk watermark (rotate-12, desktop only) -->
-      <span class="hero-watermark asterisk-mark"></span>
+      <svg class="hero-watermark asterisk-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 2.5v19M3.9 7.25l16.2 9.5M20.1 7.25l-16.2 9.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" />
+      </svg>
       <form id="login-form" class="card login-card">
-        <div class="brand">
-          <span class="asterisk-mark" style="margin-right: 6px; vertical-align: middle;"></span>
-          <span class="brand-name">Mailer</span>
-        </div>
-        <h1>Sign in</h1>
-        <p class="muted">Enter your admin password to continue.</p>
-        <label class="field">
-          <span class="font-mono text-xs uppercase tracking-widest text-muted-foreground">PASSWORD</span>
-          <input type="password" id="login-password" autocomplete="current-password" required />
-        </label>
-        <button class="btn brand" type="submit">Create campaign</button>
-        <p id="login-error" class="error" hidden></p>
-      </form>
-    </main>
-
-    <!-- ===================== APP SHELL ===================== -->
-    <div id="app-view" class="app" hidden>
-      <aside class="sidebar">
         <div class="logo-wrapper">
-          <svg class="asterisk-mark" viewBox="0 0 24 24" fill="none" stroke="current" stroke-width="2.8" stroke-linecap="round"><path d="M12 2.5v19M3.9 7.25l16.2 9.5M20.1 7.25l-16.2 9.5"></path></svg>
+          <svg class="asterisk-mark asterisk-gradient" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2.5v19M3.9 7.25l16.2 9.5M20.1 7.25l-16.2 9.5" stroke="url(#asterisk-grad)" stroke-width="2.8" stroke-linecap="round" />
+          </svg>
+          <span class="hairline"></span>
           <span class="logo-text">
             <span class="text-bold">Mailer</span>
             <span class="text-small">Reliability by Design.</span>
           </span>
+        </div>
+        <h1>Sign in</h1>
+        <p class="muted">Enter your admin password to continue.</p>
+        <label class="field">
+          <span>Password</span>
+          <input type="password" id="login-password" autocomplete="current-password" required />
+        </label>
+        <button class="btn default" type="submit">Sign in</button>
+        <p id="login-error" class="error" hidden></p>
+      </form>
+    </main>
+
+    <!-- ===================== APP ===================== -->
+    <div id="app-view" class="app" hidden>
+      <aside class="sidebar">
+        <div class="logo-wrapper">
+          <svg class="asterisk-mark asterisk-gradient" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2.5v19M3.9 7.25l16.2 9.5M20.1 7.25l-16.2 9.5" stroke="url(#asterisk-grad)" stroke-width="2.8" stroke-linecap="round" />
+          </svg>
           <span class="hairline"></span>
+          <span class="logo-text">
+            <span class="text-bold">Mailer</span>
+            <span class="text-small">Reliability by Design.</span>
+          </span>
         </div>
         <nav>
           <button class="nav-item active" data-view="dashboard">Campaigns</button>
@@ -74,14 +81,14 @@
               <h1>Campaigns</h1>
               <p class="muted">Bulk + scheduled sending via Resend.</p>
             </div>
-            <button class="btn brand" data-view="new">+ New campaign</button>
+            <button class="btn default" data-view="new">+ New campaign</button>
           </header>
           <div id="campaign-list" class="campaign-list">
             <p class="muted">Loading…</p>
           </div>
         </div>
 
-        <!-- ---------- NEW CAMPAIGN ---------- -->
+        <!-- ---------- NEW CAMPAIGN (4-step wizard) ---------- -->
         <div id="view-new" class="view" hidden>
           <header class="page-head">
             <div>
@@ -91,110 +98,132 @@
             <button class="btn ghost" data-view="dashboard">Cancel</button>
           </header>
 
-          <form id="campaign-form" class="grid">
-            <!-- 1. Excel upload -->
-            <div class="card span-2">
-              <h2 class="ebrow">01 Recipients</h2>
-              <p class="muted">
-                Excel with columns <code>Email</code>, <code>Subject</code>, <code>Body</code>.
-                Any extra columns become merge tags (e.g. <code>Name</code> → <code>{{Name}}</code>).
-                Optional <code>SendAt</code> column overrides per-row timing.
-              </p>
-              <label class="drop" id="dropzone">
-                <input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden />
-                <strong>Drop your Excel file here</strong>
-                <span class="muted">or click to browse — .xlsx, .xls, .csv</span>
-              </label>
-              <div id="file-info" class="file-info" hidden></div>
-              <div id="sheet-preview" class="table-wrap" hidden></div>
-            </div>
+          <div class="wizard-head" id="wizard-head">
+            <span class="dot current" data-dot="1"></span><span>Recipients</span>
+            <span class="dot" data-dot="2"></span><span>Sender &amp; content</span>
+            <span class="dot" data-dot="3"></span><span>Schedule</span>
+            <span class="dot" data-dot="4"></span><span>Review</span>
+          </div>
 
-            <!-- 2. Sender + content -->
-            <div class="card">
-              <h2>2 · Sender & content</h2>
-              <label class="field">
-                <span>Campaign name</span>
-                <input id="f-name" placeholder="November outreach" required />
-              </label>
-              <label class="field">
-                <span>From (sender)</span>
-                <select id="f-sender"></select>
-                <small class="muted">Pulled live from your Mailflare mailboxes.</small>
-              </label>
-              <label class="field">
-                <span>Reply-to (optional)</span>
-                <input id="f-replyto" type="email" placeholder="replies@asterick.tech" />
-              </label>
-              <label class="field">
-                <span>Subject template</span>
-                <input id="f-subject" placeholder="Hi {{Name}}, a quick note" required />
-              </label>
-              <label class="field">
-                <span>Body template (HTML)</span>
-                <textarea id="f-body" rows="8" placeholder="<p>Hello {{Name}}, ...</p>" required></textarea>
-              </label>
-              <button type="button" id="btn-preview" class="btn ghost">Live preview</button>
-            </div>
-
-            <!-- 3. Schedule -->
-            <div class="card">
-              <h2>3 · Schedule</h2>
-              <div class="seg" id="schedule-mode">
-                <button type="button" class="seg-btn active" data-mode="now">Send now</button>
-                <button type="button" class="seg-btn" data-mode="datetime">Pick date & time</button>
-                <button type="button" class="seg-btn" data-mode="interval">Interval drip</button>
+          <form id="campaign-form">
+            <!-- STEP 1 — Recipients -->
+            <div class="wizard-step active" data-step="1">
+              <div class="card">
+                <p class="eyebrow"><span class="num">01</span>Recipients</p>
+                <p class="muted">
+                  Excel with columns <code>Email</code>, <code>Subject</code>, <code>Body</code>.
+                  Any extra columns become merge tags (e.g. <code>Name</code> → <code>{{Name}}</code>).
+                  Optional <code>SendAt</code> column overrides per-row timing.
+                </p>
+                <label class="drop" id="dropzone">
+                  <input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden />
+                  <strong>Drop your Excel file here</strong>
+                  <span class="muted">or click to browse — .xlsx, .xls, .csv</span>
+                </label>
+                <div id="file-info" class="file-info" hidden></div>
+                <div id="sheet-preview" class="table-wrap" hidden></div>
               </div>
-              <p class="muted text-xs uppercase tracking-widest blocked:block mt-2" id="interval-helper">
-                Applies to batches after the first. <span class="font-mono" id="interval-note">'Send now' sends batch 1 immediately.</span>
-              </p>
-              <label class="field" id="field-datetime" hidden>
-                <span>Send at</span>
-                <input id="f-scheduledat" type="datetime-local" />
-              </label>
-              <label class="field" id="field-interval">
-                <span>Interval (minutes between batches)</span>
-                <input id="f-interval" type="number" min="1" max="1440" value="30" />
-              </label>
-              <label class="field">
-                <span>Batch size (emails per tick)</span>
-                <input id="f-batch" type="number" min="1" max="100" value="5" />
-              </label>
-              <label class="check">
-                <input id="f-tracking" type="checkbox" checked />
-                <span>Open & click tracking</span>
-              </label>
-              <details class="recur">
-                <summary>Recurring campaign</summary>
-                <div class="row">
-                  <label class="field">
-                    <span>Repeat</span>
-                    <select id="f-recur-freq">
-                      <option value="">Off</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                  </label>
-                  <label class="field">
-                    <span>Until (optional)</span>
-                    <input id="f-recur-until" type="datetime-local" />
-                  </label>
+            </div>
+
+            <!-- STEP 2 — Sender & content -->
+            <div class="wizard-step" data-step="2">
+              <div class="card">
+                <p class="eyebrow"><span class="num">02</span>Sender &amp; content</p>
+                <label class="field">
+                  <span>Campaign name</span>
+                  <input id="f-name" placeholder="November outreach" required />
+                </label>
+                <label class="field">
+                  <span>From (sender)</span>
+                  <select id="f-sender"></select>
+                  <small class="muted">Pulled live from your Mailflare mailboxes.</small>
+                </label>
+                <label class="field">
+                  <span>Reply-to (optional)</span>
+                  <input id="f-replyto" type="email" placeholder="replies@asterick.tech" />
+                </label>
+                <label class="field">
+                  <span>Subject template</span>
+                  <input id="f-subject" placeholder="Hi {{Name}}, a quick note" required />
+                </label>
+                <label class="field">
+                  <span>Body template (HTML)</span>
+                  <textarea id="f-body" rows="8" placeholder="<p>Hello {{Name}}, ...</p>" required></textarea>
+                </label>
+                <button type="button" id="btn-preview" class="btn outline">Live preview</button>
+
+                <div class="attach-section">
+                  <p class="eyebrow" style="margin-top:18px">Attachments (optional)</p>
+                  <p class="muted">Up to 10 files, 10 MB each. Attached to every email in the campaign.</p>
+                  <input id="attach-input" type="file" multiple />
+                  <div id="attach-list" class="attach-list"></div>
                 </div>
-              </details>
+              </div>
             </div>
 
-            <!-- 4. Attachments -->
-            <div class="card span-2">
-              <h2>4 · Attachments (optional)</h2>
-              <p class="muted">Up to 10 files, 10 MB each. Attached to every email in the campaign.</p>
-              <input id="attach-input" type="file" multiple />
-              <div id="attach-list" class="attach-list"></div>
+            <!-- STEP 3 — Schedule -->
+            <div class="wizard-step" data-step="3">
+              <div class="card">
+                <p class="eyebrow"><span class="num">03</span>Schedule</p>
+                <div class="seg" id="schedule-mode">
+                  <button type="button" class="seg-btn active" data-mode="now">Send now</button>
+                  <button type="button" class="seg-btn" data-mode="datetime">Pick date &amp; time</button>
+                  <button type="button" class="seg-btn" data-mode="interval">Interval drip</button>
+                </div>
+                <label class="field" id="field-datetime" hidden>
+                  <span>Send at</span>
+                  <input id="f-scheduledat" type="datetime-local" />
+                </label>
+                <label class="field" id="field-interval">
+                  <span>Interval (minutes between batches)</span>
+                  <input id="f-interval" type="number" min="1" max="1440" value="30" />
+                  <small class="muted">Applies to batches after the first. "Send now" sends batch 1 immediately.</small>
+                </label>
+                <label class="field">
+                  <span>Batch size (emails per tick)</span>
+                  <input id="f-batch" type="number" min="1" max="100" value="5" />
+                </label>
+                <label class="check">
+                  <input id="f-tracking" type="checkbox" checked />
+                  <span>Open &amp; click tracking</span>
+                </label>
+                <details class="recur">
+                  <summary>Recurring campaign</summary>
+                  <div class="row">
+                    <label class="field">
+                      <span>Repeat</span>
+                      <select id="f-recur-freq">
+                        <option value="">Off</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </label>
+                    <label class="field">
+                      <span>Until (optional)</span>
+                      <input id="f-recur-until" type="datetime-local" />
+                    </label>
+                  </div>
+                </details>
+              </div>
             </div>
 
-            <!-- 5. Submit -->
-            <div class="card span-2 submit-bar">
-              <div id="create-status" class="muted"></div>
-              <button type="submit" class="btn brand" id="btn-create">Create campaign</button>
+            <!-- STEP 4 — Review & send -->
+            <div class="wizard-step" data-step="4">
+              <div class="card">
+                <p class="eyebrow"><span class="num">04</span>Review &amp; send</p>
+                <div id="review-summary"></div>
+              </div>
+            </div>
+
+            <!-- Wizard nav -->
+            <div class="wizard-nav">
+              <button type="button" id="btn-back" class="btn ghost" hidden>Back</button>
+              <span id="create-status" class="muted"></span>
+              <span class="row gap">
+                <button type="button" id="btn-next" class="btn default">Next</button>
+                <button type="submit" id="btn-create" class="btn brand" hidden>Create campaign</button>
+              </span>
             </div>
           </form>
         </div>
@@ -203,24 +232,24 @@
         <div id="view-detail" class="view" hidden>
           <header class="page-head">
             <div>
-              <button class="btn ghost back" data-view="dashboard">← Back</button>
+              <button class="btn ghost" data-view="dashboard">← Back</button>
               <h1 id="detail-title">Campaign</h1>
               <p id="detail-sub" class="muted"></p>
             </div>
             <div class="row gap">
               <button id="btn-pause" class="btn ghost">Pause</button>
               <button id="btn-resume" class="btn ghost" hidden>Resume</button>
-              <button id="btn-test" class="btn ghost">Test send</button>
-              <button id="btn-export" class="btn ghost">Export CSV</button>
+              <button id="btn-test" class="btn outline">Test send</button>
+              <button id="btn-export" class="btn outline">Export CSV</button>
               <button id="btn-delete" class="btn danger">Delete</button>
             </div>
           </header>
           <div id="detail-stats" class="stats"></div>
 
           <div class="card insights">
-            <h2>Insights</h2>
+            <p class="eyebrow"><span class="num">★</span>Insights</p>
             <p class="muted">Delivery events reported by Resend.</p>
-            <div id="insight-stats" class="stats insights-stats"></div>
+            <div id="insight-stats" class="stats insights-stats" style="margin-top:12px"></div>
             <div id="insight-events" class="table-wrap" hidden></div>
           </div>
 
@@ -232,10 +261,10 @@
     <!-- test-send modal -->
     <div id="test-modal" class="modal" hidden>
       <div class="card modal-card">
-        <h2>Send a test</h2>
+        <p class="eyebrow"><span class="num">→</span>Send a test</p>
         <p class="muted">Sends the first row's rendered email to the address below.</p>
         <label class="field">
-          <span class="font-mono text-xs uppercase tracking-widest text-muted-foreground">Test recipient</span>
+          <span>Test recipient</span>
           <input id="test-email" type="email" placeholder="you@asterick.tech" />
         </label>
         <div class="row gap end">
@@ -245,14 +274,14 @@
       </div>
     </div>
 
-    <!-- preview modal -->
-    <div id="preview-modal" class="modal" hidden>
-      <div class="card modal-card wide preview-modal">
-        <h2>Preview</h2>
+    <!-- preview modal (inverted panel — asterick.tech contact signature) -->
+    <div id="preview-modal" class="modal preview-modal" hidden>
+      <div class="card modal-card wide">
+        <p class="eyebrow"><span class="num">★</span>Preview</p>
         <div id="preview-subject" class="preview-subject"></div>
         <iframe id="preview-frame" class="preview-frame"></iframe>
         <div class="row gap end">
-          <button id="preview-close" class="btn brand close">Close</button>
+          <button id="preview-close" class="btn close">Close</button>
         </div>
       </div>
     </div>

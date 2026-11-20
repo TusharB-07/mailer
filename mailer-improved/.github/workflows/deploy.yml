@@ -1,0 +1,44 @@
+# Deploy the Mailer Worker to Cloudflare on every push to main.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN   – token with Workers Scripts:Edit + D1/R2 access
+#   CLOUDFLARE_ACCOUNT_ID  – your Cloudflare account id
+#
+# Worker runtime secrets (RESEND_API_KEY, AUTH_PASSWORD, SESSION_SECRET) are
+# NOT managed by `wrangler deploy`. Set them once, from a trusted machine:
+#   npx wrangler secret put RESEND_API_KEY
+#   npx wrangler secret put AUTH_PASSWORD
+#   npx wrangler secret put SESSION_SECRET
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Typecheck & deploy Worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Deploy to Cloudflare
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

@@ -1,28 +1,24 @@
 /* Mailer dashboard client. Vanilla JS. Parses Excel in the browser with
-   SheetJS, posts JSON to the Worker API. All real validation is server-side.
-   UI rebuilt to match asterick.tech design language exactly. */
-
+   SheetJS, posts JSON to the Worker API. All real validation is server-side. */
 "use strict";
 
 // ============================================================
 // State
 // ============================================================
 const state = {
-  rows: [],        // parsed recipients: [{email, subject?, body?, sendAt?, ...merge}]
-  headers: [],     // detected column order
-  mergeKeys: [],   // extra columns usable as {{tags}}
-  attachments: [], // [{id, filename, size}]
+  rows: [],
+  headers: [],
+  mergeKeys: [],
+  attachments: [],
   scheduleMode: "now",
   detailId: null,
   pollTimer: null,
   reducedMotion: false,
+  currentStep: 1,
 };
 
-// ============================================================
-// DOM shorthands
-// ============================================================
 const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => document.querySelectorAll(sel).length ? [...document.querySelectorAll(sel)] : [];
+const $$ = (sel) => [...document.querySelectorAll(sel)].filter(Boolean);
 
 // ============================================================
 // Helpers
@@ -50,9 +46,14 @@ function pct(c) {
   if (!c || !c.total_rows) return 0;
   return Math.round(((c.sent_count + c.failed_count) / c.total_rows) * 100);
 }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  );
+}
 
 // ============================================================
-// Reduced motion detection
+// Reduced motion + reveal
 // ============================================================
 (function initReducedMotion() {
   const mq = matchMedia("(prefers-reduced-motion: reduce)");
@@ -60,45 +61,43 @@ function pct(c) {
   mq.addEventListener("change", (e) => (state.reducedMotion = e.matches));
 })();
 
-// ============================================================
-// Reveal animation system (ONE primitive)
-// ============================================================
-// Fade in + rise 20px over 550ms, cubic-bezier(0.21, 0.47, 0.32, 0.98),
-// plays once, fires 60px inside viewport. Disabled under reduced motion.
-
 function initReveal() {
   if (state.reducedMotion) return;
-
-  const observerOptions = {
-    root: null,
-    rootMargin: "60px",
-    threshold: 0,
-  };
-
-  const revealObserver = new IntersectionObserver(
+  const obs = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          const el = entry.target;
-          el.style.transition = "opacity 0.55s cubic-bezier(0.21, 0.47, 0.32, 0.98), "
-            + "transform 0.55s cubic-bezier(0.21, 0.47, 0.32, 0.98)";
-          el.style.opacity = "1";
-          el.style.transform = "translateY(0)";
-          revealObserver.unobserve(el);
+          entry.target.classList.add("reveal-visible");
+          obs.unobserve(entry.target);
         }
       });
     },
-    observerOptions
+    { rootMargin: "60px", threshold: 0 }
   );
+  $$(".reveal").forEach((el) => obs.observe(el));
+}
 
-  // Wrap all content blocks in Reveal on page load
-  document.querySelectorAll(".reveal").forEach((el) => {
-    el.style.opacity = "0";
-    el.style.transform = "translateY(20px)";
-    el.style.transition = "opacity 0.55s cubic-bezier(0.21, 0.47, 0.32, 0.98), "
-      + "transform 0.55s cubic-bezier(0.21, 0.47, 0.32, 0.98)";
-    revealObserver.observe(el);
+// ============================================================
+// API
+// ============================================================
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+    ...opts,
   });
+  let body = null;
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("json")) body = await res.json().catch(() => null);
+  else body = await res.text().catch(() => null);
+  if (!res.ok) {
+    const msg = (body && body.error) || `HTTP ${res.status}`;
+    const err = new Error(msg);
+    err.status = res.status;
+    err.body = body;
+    throw err;
+  }
+  return body;
 }
 
 // ============================================================
@@ -113,7 +112,6 @@ async function checkAuth() {
     showLogin();
   }
 }
-
 function showLogin() {
   $("#app-view").hidden = true;
   $("#login-view").hidden = false;
@@ -137,7 +135,7 @@ $("#login-form").addEventListener("submit", async (e) => {
     await api("/api/login", { method: "POST", body: JSON.stringify({ password: pw }) });
     if ($("#login-password")) $("#login-password").value = "";
     showApp();
-  } catch (e2) {
+  } catch {
     if (err) { err.textContent = "Wrong password."; err.hidden = false; }
   }
 });
@@ -174,11 +172,9 @@ function showView(name) {
     n.classList.toggle("active", n.dataset.view === name)
   );
   if (name === "dashboard") loadCampaigns();
+  if (name === "new") resetWizard();
 }
 
-// ============================================================
-// Sidebar click
-// ============================================================
 document.body.addEventListener("click", (e) => {
   const t = e.target.closest("[data-view]");
   if (t) {
@@ -188,26 +184,109 @@ document.body.addEventListener("click", (e) => {
 });
 
 // ============================================================
+// Wizard (4-step new campaign flow)
+// ============================================================
+function resetWizard() {
+  state.currentStep = 1;
+  showStep(1);
+}
+
+function showStep(n) {
+  state.currentStep = n;
+  $$(".wizard-step").forEach((s) =>
+    s.classList.toggle("active", Number(s.dataset.step) === n)
+  );
+  $$("#wizard-head .dot").forEach((d) => {
+    const i = Number(d.dataset.dot);
+    d.classList.toggle("current", i === n);
+    d.classList.toggle("done", i < n);
+  });
+  const back = $("#btn-back");
+  const next = $("#btn-next");
+  const create = $("#btn-create");
+  if (back) back.hidden = n === 1;
+  if (next) next.hidden = n === 4;
+  if (create) create.hidden = n !== 4;
+  if (n === 4) renderReview();
+}
+
+function validateStep(n) {
+  if (n === 1) {
+    if (!state.rows.length) { toast("Upload an Excel file first", true); return false; }
+    return true;
+  }
+  if (n === 2) {
+    if (!$("#f-name").value.trim()) { toast("Enter a campaign name", true); return false; }
+    if (!$("#f-sender").value) { toast("Pick a sender", true); return false; }
+    if (!$("#f-subject").value.trim()) { toast("Enter a subject template", true); return false; }
+    if (!$("#f-body").value.trim()) { toast("Enter a body template", true); return false; }
+    return true;
+  }
+  if (n === 3) {
+    if (state.scheduleMode === "datetime") {
+      const v = $("#f-scheduledat").value;
+      if (!v) { toast("Pick a date and time", true); return false; }
+    }
+    return true;
+  }
+  return true;
+}
+
+function renderReview() {
+  const el = $("#review-summary");
+  if (!el) return;
+  const mode = state.scheduleMode;
+  const sender = $("#f-sender").value || "—";
+  const recur = $("#f-recur-freq").value;
+  const tracking = $("#f-tracking").checked ? "On" : "Off";
+  const sample = state.rows[0] || {};
+  const subjectRendered = ($("#f-subject").value || "").replace(/\{\{(\w+)\}\}/g, (_, k) => sample[k] || "");
+  const modeLabel = mode === "now" ? "Send now (first batch immediately)"
+    : mode === "datetime" ? `At ${$("#f-scheduledat").value || "—"}`
+    : "Interval drip";
+  el.innerHTML = `
+    <div class="review-grid">
+      <div><span class="review-lbl">Recipients</span><span class="review-val">${state.rows.length} rows</span></div>
+      <div><span class="review-lbl">From</span><span class="review-val">${escapeHtml(sender)}</span></div>
+      <div><span class="review-lbl">Subject</span><span class="review-val">${escapeHtml(subjectRendered)}</span></div>
+      <div><span class="review-lbl">Schedule</span><span class="review-val">${escapeHtml(modeLabel)}</span></div>
+      <div><span class="review-lbl">Interval</span><span class="review-val">${$("#f-interval").value} min · batch ${$("#f-batch").value}</span></div>
+      <div><span class="review-lbl">Tracking</span><span class="review-val">${tracking}</span></div>
+      ${recur ? `<div><span class="review-lbl">Recurring</span><span class="review-val">${escapeHtml(recur)}</span></div>` : ""}
+      <div><span class="review-lbl">Attachments</span><span class="review-val">${state.attachments.length}</span></div>
+    </div>
+    <p class="muted" style="margin-top:14px">Merge tags available: ${
+      state.mergeKeys.length ? state.mergeKeys.map((k) => "<code>{{" + escapeHtml(k) + "}}</code>").join(" ") : "none"
+    }</p>`;
+}
+
+$("#btn-next").addEventListener("click", () => {
+  if (validateStep(state.currentStep) && state.currentStep < 4) showStep(state.currentStep + 1);
+});
+$("#btn-back").addEventListener("click", () => {
+  if (state.currentStep > 1) showStep(state.currentStep - 1);
+});
+
+// ============================================================
 // Senders
 // ============================================================
 async function loadSenders() {
   try {
     const r = await api("/api/senders");
     const sel = $("#f-sender");
+    if (!sel) return;
     if (!r.senders.length) {
-      if (sel) sel.innerHTML = '<option value="">— no Mailflare mailboxes found —</option>';
+      sel.innerHTML = '<option value="">— no Mailflare mailboxes found —</option>';
       return;
     }
-    if (sel) {
-      sel.innerHTML = "";
-      for (const s of r.senders) {
-        const opt = document.createElement("option");
-        opt.value = s.address;
-        opt.textContent = `${s.address}${s.displayName ? " — " + s.displayName : ""}${
-          s.sendingEnabled ? "" : " (sending off)"
-        }`;
-        sel.appendChild(opt);
-      }
+    sel.innerHTML = "";
+    for (const s of r.senders) {
+      const opt = document.createElement("option");
+      opt.value = s.address;
+      opt.textContent = `${s.address}${s.displayName ? " — " + s.displayName : ""}${
+        s.sendingEnabled ? "" : " (sending off)"
+      }`;
+      sel.appendChild(opt);
     }
   } catch (e) {
     toast("Could not load senders: " + e.message, true);
@@ -259,7 +338,6 @@ async function handleFile(file) {
     const raw = XLSX.utils.sheet_to_json(sheet, { defval: "" });
     if (!raw.length) throw new Error("No rows found in the first sheet.");
 
-    // Normalize each row: pull out reserved keys, keep the rest as merge data.
     const rows = [];
     for (const r of raw) {
       const eKey = findKey(r, ["Email", "email", "E-mail", "to", "To"]);
@@ -290,19 +368,17 @@ async function handleFile(file) {
       (h) => !["email", "subject", "body", "sendat", "send_at"].includes(h.toLowerCase())
     );
 
-    const infoEl = $("#file-info");
-    if (infoEl) {
-      infoEl.innerHTML = `<strong>${file.name}</strong> — ${rows.length} rows · ${
-        state.mergeKeys.length ? "merge tags: " + state.mergeKeys.map((k) => "{{" + k + "}}").join(", ") : "no merge tags"
+    if (info) {
+      info.innerHTML = `<strong>${escapeHtml(file.name)}</strong> — ${rows.length} rows · ${
+        state.mergeKeys.length ? "merge tags: " + state.mergeKeys.map((k) => "<code>{{" + escapeHtml(k) + "}}</code>").join(", ") : "no merge tags"
       }`;
     }
-
     renderPreview(rows);
   } catch (e) {
-    const infoEl = $("#file-info");
-    if (infoEl) {
-      infoEl.innerHTML = `<span class="error">${e.message}</span>`;
-      $("#sheet-preview").hidden = true;
+    if (info) {
+      info.innerHTML = `<span class="error">${escapeHtml(e.message)}</span>`;
+      const sp = $("#sheet-preview");
+      if (sp) sp.hidden = true;
     }
     state.rows = [];
   }
@@ -323,14 +399,8 @@ function renderPreview(rows) {
   wrap.hidden = false;
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) =>
-    ({ "&": "&", "<": "<", ">": ">", '"': """, "'": "'" }[c])
-  );
-}
-
 // ============================================================
-// Schedule mode
+// Schedule mode (interval field stays visible in every mode)
 // ============================================================
 $("#schedule-mode").addEventListener("click", (e) => {
   const b = e.target.closest(".seg-btn");
@@ -338,18 +408,8 @@ $("#schedule-mode").addEventListener("click", (e) => {
   state.scheduleMode = b.dataset.mode;
   $$("#schedule-mode .seg-btn").forEach((x) => x.classList.toggle("active", x === b));
   $("#field-datetime").hidden = state.scheduleMode !== "datetime";
-  $("#field-interval").hidden = state.scheduleMode === "now";
+  // interval field stays visible in ALL modes (including "now")
 });
-
-// Interval helper text
-const intervalHelper = $("#interval-helper");
-if (intervalHelper) {
-  intervalHelper.addEventListener("click", () => {
-    if (state.scheduleMode === "now") {
-      alert("'Send now' sends batch 1 immediately. The interval applies to batches 2+.");
-    }
-  });
-}
 
 // ============================================================
 // Attachments
@@ -357,14 +417,8 @@ if (intervalHelper) {
 $("#attach-input").addEventListener("change", async () => {
   const files = [...($("#attach-input").files || [])];
   for (const f of files) {
-    if (f.size > 10 * 1024 * 1024) {
-      toast(`${f.name} is over 10 MB — skipped`, true);
-      continue;
-    }
-    if (state.attachments.length >= 10) {
-      toast("Max 10 attachments", true);
-      break;
-    }
+    if (f.size > 10 * 1024 * 1024) { toast(`${f.name} is over 10 MB — skipped`, true); continue; }
+    if (state.attachments.length >= 10) { toast("Max 10 attachments", true); break; }
     try {
       const fd = new FormData();
       fd.append("file", f);
@@ -373,7 +427,7 @@ $("#attach-input").addEventListener("change", async () => {
       const j = await res.json();
       state.attachments.push({ id: j.id, filename: j.filename, size: j.size });
       renderAttachments();
-    } catch (e) {
+    } catch {
       toast(`Failed to upload ${f.name}`, true);
     }
   }
@@ -384,18 +438,20 @@ function renderAttachments() {
   const list = $("#attach-list");
   if (!list) return;
   list.innerHTML = state.attachments
-    .map(
-      (a) => `<div class="attach-item"><span>${escapeHtml(a.filename)} · ${Math.round(a.size / 1024)} KB</span></div>`
-    )
+    .map((a) => `<div class="attach-item"><span>${escapeHtml(a.filename)} · ${Math.round(a.size / 1024)} KB</span></div>`)
     .join("");
 }
 
 // ============================================================
-// Live preview
+// Live preview (gated until subject + body are non-empty)
 // ============================================================
 $("#btn-preview").addEventListener("click", async () => {
   const subject = $("#f-subject") ? $("#f-subject").value : "";
   const body = $("#f-body") ? $("#f-body").value : "";
+  if (!subject.trim() || !body.trim()) {
+    toast("Fill the subject and body templates first", true);
+    return;
+  }
   const sample = state.rows[0] || {};
   try {
     const r = await api("/api/preview", {
@@ -410,7 +466,7 @@ $("#btn-preview").addEventListener("click", async () => {
     toast("Preview failed: " + e.message, true);
   }
 });
-$("#preview-close").addEventListener("click", () => $("#preview-modal").hidden = true);
+$("#preview-close").addEventListener("click", () => ($("#preview-modal").hidden = true));
 
 // ============================================================
 // Create campaign
@@ -418,15 +474,9 @@ $("#preview-close").addEventListener("click", () => $("#preview-modal").hidden =
 $("#campaign-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const status = $("#create-status");
-  if (!state.rows.length) {
-    toast("Upload an Excel file first", true);
-    return;
-  }
+  if (!state.rows.length) { toast("Upload an Excel file first", true); return; }
   const sender = $("#f-sender") ? $("#f-sender").value : "";
-  if (!sender) {
-    toast("Pick a sender", true);
-    return;
-  }
+  if (!sender) { toast("Pick a sender", true); return; }
   const mode = state.scheduleMode;
   const recurringFreq = $("#f-recur-freq") ? $("#f-recur-freq").value : "";
   const recurringUntil = $("#f-recur-until") ? $("#f-recur-until").value : "";
@@ -453,7 +503,6 @@ $("#campaign-form").addEventListener("submit", async (e) => {
   try {
     const r = await api("/api/campaigns", { method: "POST", body: JSON.stringify(payload) });
     toast(`Campaign created${r.sentNow ? " — sent " + r.sentNow + " now" : ""}`);
-    // reset form
     state.rows = [];
     state.attachments = [];
     if ($("#campaign-form")) $("#campaign-form").reset();
@@ -464,7 +513,7 @@ $("#campaign-form").addEventListener("submit", async (e) => {
     showView("dashboard");
     loadCampaigns();
   } catch (e) {
-    if (status) status.innerHTML = `<span class="error">${e.message}</span>`;
+    if (status) status.innerHTML = `<span class="error">${escapeHtml(e.message)}</span>`;
     toast(e.message, true);
   } finally {
     if (btn) btn.disabled = false;
@@ -481,8 +530,7 @@ async function loadCampaigns() {
   try {
     const r = await api("/api/campaigns");
     if (!r.campaigns.length) {
-      wrap.innerHTML =
-        '<div class="card"><p class="muted">No campaigns yet. Click <strong>New campaign</strong> to send your first batch.</p></div>';
+      wrap.innerHTML = '<div class="card"><p class="muted">No campaigns yet. Click <strong>New campaign</strong> to send your first batch.</p></div>';
       return;
     }
     wrap.innerHTML = r.campaigns.map(campCardHtml).join("");
@@ -490,20 +538,20 @@ async function loadCampaigns() {
       el.addEventListener("click", () => openDetail(el.dataset.open))
     );
   } catch (e) {
-    wrap.innerHTML = `<p class="error">${e.message}</p>`;
+    wrap.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
   }
 }
 
 function campCardHtml(c) {
   const p = pct(c);
-  return `<div class="card camp-card" data-open="${c.id}" role="button">
+  return `<div class="card camp-card" data-open="${escapeHtml(c.id)}" role="button">
     <div>
       <p class="camp-title">${escapeHtml(c.name)}</p>
       <p class="camp-meta">${escapeHtml(c.sender_address)} · ${c.total_rows} recipients · ${fmtDate(c.created_at)}</p>
       <div class="progress"><span style="width:${p}%"></span></div>
     </div>
     <div class="row gap">
-      <span class="badge ${c.status}">${c.status}</span>
+      <span class="badge status-${escapeHtml(c.status)}">${escapeHtml(c.status)}</span>
       <span class="muted">${c.sent_count}/${c.total_rows} sent</span>
     </div>
   </div>`;
@@ -516,7 +564,6 @@ async function openDetail(id) {
   state.detailId = id;
   showView("detail");
   await loadDetail();
-  // poll while active
   clearInterval(state.pollTimer);
   state.pollTimer = setInterval(async () => {
     const c = await api(`/api/campaigns/${id}`).catch(() => null);
@@ -544,7 +591,6 @@ async function loadDetail() {
   }
 }
 
-// Insights: delivered / opened / clicked / bounced counts + recent events.
 async function loadInsights(id) {
   const statsEl = $("#insight-stats");
   const eventsEl = $("#insight-events");
@@ -556,27 +602,17 @@ async function loadInsights(id) {
       <div class="stat"><div class="num" style="color:var(--ok)">${n.delivered || 0}</div><div class="lbl">Delivered</div></div>
       <div class="stat"><div class="num">${n.opened || 0}</div><div class="lbl">Opened</div></div>
       <div class="stat"><div class="num">${n.clicked || 0}</div><div class="lbl">Clicked</div></div>
-      <div class="stat"><div class="num" style="color:var(--danger)">${n.bounced || 0}</div><div class="lbl">Bounced</div></div>`;
-
+      <div class="stat"><div class="num" style="color:var(--destructive)">${n.bounced || 0}</div><div class="lbl">Bounced</div></div>`;
     const events = r.events || [];
-    if (!events.length) {
-      eventsEl.hidden = true;
-      eventsEl.innerHTML = "";
-      return;
-    }
+    if (!events.length) { eventsEl.hidden = true; eventsEl.innerHTML = ""; return; }
     eventsEl.hidden = false;
     eventsEl.innerHTML = `<table>
       <thead><tr><th>When</th><th>Event</th><th>Resend ID</th></tr></thead>
-      <tbody>${events
-        .slice(0, 50)
-        .map(
-          (ev) => `<tr>
+      <tbody>${events.slice(0, 50).map((ev) => `<tr>
         <td>${fmtDate(ev.created_at)}</td>
         <td><span class="badge">${escapeHtml(ev.event_type)}</span></td>
         <td>${escapeHtml(ev.resend_id || "—")}</td>
-      </tr>`
-        )
-        .join("")}</tbody></table>`;
+      </tr>`).join("")}</tbody></table>`;
   } catch (e) {
     statsEl.innerHTML = `<p class="error">${escapeHtml(e.message)}</p>`;
     eventsEl.hidden = true;
@@ -587,19 +623,15 @@ function renderDetail(r) {
   const c = r.campaign;
   if ($("#detail-title")) $("#detail-title").textContent = c ? c.name : "";
   if ($("#detail-sub")) $("#detail-sub").textContent = c ? `${c.sender_address} · ${c.schedule_mode} · batch ${c.batch_size} every ${c.interval_minutes}m` : "";
-
   const p = pct(c);
   const now = Math.floor(Date.now() / 1000);
-  const scheduled = (r.outbox || []).filter(
-    (o) => o.status === "pending" && o.send_at && o.send_at > now
-  ).length;
+  const scheduled = (r.outbox || []).filter((o) => o.status === "pending" && o.send_at && o.send_at > now).length;
   if ($("#detail-stats")) {
     $("#detail-stats").innerHTML = `
       <div class="stat"><div class="num">${c ? c.total_rows : 0}</div><div class="lbl">Total</div></div>
       <div class="stat"><div class="num" style="color:var(--ok)">${c ? c.sent_count : 0}</div><div class="lbl">Sent</div></div>
-      <div class="stat"><div class="num" style="color:var(--danger)">${c ? c.failed_count : 0}</div><div class="lbl">Failed</div></div>
-      <div class="stat"><div class="num" style="color:var(--accent)">${scheduled}</div><div class="lbl">Scheduled</div></div>
-      <div class="stat"><div class="num">${c ? c.total_rows - c.sent_count - c.failed_count : 0}</div><div class="lbl">Pending</div></div>`;
+      <div class="stat"><div class="num" style="color:var(--destructive)">${c ? c.failed_count : 0}</div><div class="lbl">Failed</div></div>
+      <div class="stat"><div class="num">${scheduled}</div><div class="lbl">Scheduled</div></div>`;
   }
   if ($("#btn-pause")) $("#btn-pause").hidden = c && c.status !== "active";
   if ($("#btn-resume")) $("#btn-resume").hidden = c && c.status === "active";
@@ -608,30 +640,25 @@ function renderDetail(r) {
   if ($("#detail-outbox")) {
     $("#detail-outbox").innerHTML = `<table>
       <thead><tr><th>#</th><th>To</th><th>Status</th><th>Scheduled for</th><th>Sent</th><th>Resend ID</th><th>Error</th></tr></thead>
-      <tbody>${rows
-        .map(
-          (o) => `<tr>
-        <td>${o ? o.seq : "—"}</td>
-        <td>${o ? escapeHtml(o.to_email) : "—"}</td>
-        <td><span class="badge ${o ? o.status : ""}">${o ? o.status : "—"}</span></td>
-        <td>${o ? o.send_at ? fmtDate(o.send_at) : "—" : "—"}</td>
-        <td>${o ? fmtDate(o.sent_at) : "—"}</td>
-        <td>${o ? escapeHtml(o.resend_id || "") : "—"}</td>
-        <td>${o ? escapeHtml((o.error || "").slice(0, 80)) : "—"}</td>
-      </tr>`
-        )
-        .join("")}</tbody></table>${
-      r && r.outbox && r.outbox.length > 200 ? `<p class="muted" style="padding:8px 12px">Showing first 200 of ${r.outbox.length} rows. Export CSV for the full report.</p>` : ""
+      <tbody>${rows.map((o) => `<tr>
+        <td>${o.seq}</td>
+        <td>${escapeHtml(o.to_email)}</td>
+        <td><span class="badge status-${escapeHtml(o.status)}">${escapeHtml(o.status)}</span></td>
+        <td>${o.send_at ? fmtDate(o.send_at) : "—"}</td>
+        <td>${fmtDate(o.sent_at)}</td>
+        <td>${escapeHtml(o.resend_id || "")}</td>
+        <td>${escapeHtml((o.error || "").slice(0, 80))}</td>
+      </tr>`).join("")}</tbody></table>${
+      r.outbox && r.outbox.length > 200 ? `<p class="muted" style="padding:8px 12px">Showing first 200 of ${r.outbox.length} rows. Export CSV for the full report.</p>` : ""
     }`;
   }
 }
 
-// detail controls
 $("#btn-pause").addEventListener("click", async () => {
   if (state.detailId) {
     await api(`/api/campaigns/${state.detailId}/pause`, { method: "POST" });
     toast("Paused");
-    if (state.detailId) loadDetail();
+    loadDetail();
   }
 });
 $("#btn-resume").addEventListener("click", async () => {
@@ -656,7 +683,6 @@ $("#btn-export").addEventListener("click", () => {
   if (state.detailId) window.location.href = `/api/campaigns/${state.detailId}/export`;
 });
 
-// test send modal
 $("#btn-test").addEventListener("click", () => { if ($("#test-modal")) $("#test-modal").hidden = false; });
 $("#test-cancel").addEventListener("click", () => { if ($("#test-modal")) $("#test-modal").hidden = true; });
 $("#test-confirm").addEventListener("click", async () => {

@@ -50,12 +50,15 @@ CREATE TABLE IF NOT EXISTS mailer_outbox (
   retry_count      INTEGER NOT NULL DEFAULT 0,
   next_retry_at    INTEGER,
   sent_at          INTEGER,
+  send_at          INTEGER,                                -- per-row scheduled send time (unix seconds); null = follow campaign cadence
   created_at       INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS mailer_outbox_pick_idx
   ON mailer_outbox (campaign_id, status, seq);
 CREATE INDEX IF NOT EXISTS mailer_outbox_retry_idx
   ON mailer_outbox (status, next_retry_at);
+CREATE INDEX IF NOT EXISTS mailer_outbox_sendat_idx
+  ON mailer_outbox (campaign_id, status, send_at);
 
 CREATE TABLE IF NOT EXISTS mailer_attachments (
   id          TEXT PRIMARY KEY,
@@ -83,13 +86,11 @@ CREATE INDEX IF NOT EXISTS mailer_events_campaign_idx
 
 -- ------------------------------------------------------------------
 -- Migration: per-row SendAt (2026-11-20)
--- Adds mailer_outbox.send_at (unix seconds) so each recipient row can
--- be scheduled independently of the campaign-level next_run_at.
---
--- SQLite/D1 has no `ADD COLUMN IF NOT EXISTS`, so this ALTER runs once
--- per database. On a fresh database it applies right after the CREATE
--- TABLE above; on an existing database it adds the missing column.
+-- send_at is now in the CREATE TABLE above, so fresh databases get it
+-- automatically. This ALTER is only for EXISTING databases that were
+-- created before this column existed. SQLite/D1 has no
+-- `ADD COLUMN IF NOT EXISTS`, so on a database that already has the
+-- column this statement errors harmlessly ("duplicate column name") —
+-- the rest of the schema (all CREATE ... IF NOT EXISTS) still applies.
 -- ------------------------------------------------------------------
 ALTER TABLE mailer_outbox ADD COLUMN send_at INTEGER;
-CREATE INDEX IF NOT EXISTS mailer_outbox_sendat_idx
-  ON mailer_outbox (campaign_id, status, send_at);

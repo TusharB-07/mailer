@@ -61,19 +61,37 @@ async function processCampaign(
 ): Promise<{ sent: number; failed: number }> {
   const t = nowSec();
 
-  // Pick the next pending batch.
+  // Pick the next pending batch. A row with a send_at in the future is
+  // held back until its time; NULL send_at rows follow the campaign cadence.
   const pick = await env.DB.prepare(
     `SELECT * FROM mailer_outbox
       WHERE campaign_id = ? AND status = 'pending'
+        AND (send_at IS NULL OR send_at <= ?)
       ORDER BY seq ASC LIMIT ?`
   )
-    .bind(c.id, c.batch_size)
+    .bind(c.id, t, c.batch_size)
     .all<OutboxRow>();
 
   const rows = (pick.results || []) as OutboxRow[];
 
-  // No pending rows -> cycle may be complete.
+  // No eligible rows. If some are waiting on a future send_at, park the
+  // campaign until the earliest one; otherwise the cycle may be complete.
   if (rows.length === 0) {
+    const next = await env.DB.prepare(
+      `SELECT MIN(send_at) AS at FROM mailer_outbox
+        WHERE campaign_id = ? AND status = 'pending'
+          AND send_at IS NOT NULL AND send_at > ?`
+    )
+      .bind(c.id, t)
+      .first<{ at: number | null }>();
+    if (next?.at) {
+      await env.DB.prepare(
+        "UPDATE mailer_campaigns SET next_run_at=?, updated_at=? WHERE id=?"
+      )
+        .bind(next.at, t, c.id)
+        .run();
+      return { sent: 0, failed: 0 };
+    }
     await maybeCompleteOrRecur(env, c);
     return { sent: 0, failed: 0 };
   }

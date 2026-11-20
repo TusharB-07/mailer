@@ -59,6 +59,7 @@ export interface OutboxRow {
   retry_count: number;
   next_retry_at: number | null;
   sent_at: number | null;
+  send_at: number | null;
   created_at: number;
 }
 

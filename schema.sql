@@ -6,7 +6,8 @@
 --
 -- Apply locally:    npx wrangler d1 execute mailflare --file=./schema.sql --local
 -- Apply to prod:    npx wrangler d1 execute mailflare --file=./schema.sql --remote
--- (safe to re-run: every statement is IF NOT EXISTS)
+-- (all CREATE statements are IF NOT EXISTS; see the SendAt migration at
+--  the end of this file, which runs once per database.)
 -- ==================================================================
 
 CREATE TABLE IF NOT EXISTS mailer_campaigns (
@@ -79,3 +80,16 @@ CREATE TABLE IF NOT EXISTS mailer_events (
 );
 CREATE INDEX IF NOT EXISTS mailer_events_campaign_idx
   ON mailer_events (campaign_id, created_at);
+
+-- ------------------------------------------------------------------
+-- Migration: per-row SendAt (2026-11-20)
+-- Adds mailer_outbox.send_at (unix seconds) so each recipient row can
+-- be scheduled independently of the campaign-level next_run_at.
+--
+-- SQLite/D1 has no `ADD COLUMN IF NOT EXISTS`, so this ALTER runs once
+-- per database. On a fresh database it applies right after the CREATE
+-- TABLE above; on an existing database it adds the missing column.
+-- ------------------------------------------------------------------
+ALTER TABLE mailer_outbox ADD COLUMN send_at INTEGER;
+CREATE INDEX IF NOT EXISTS mailer_outbox_sendat_idx
+  ON mailer_outbox (campaign_id, status, send_at);

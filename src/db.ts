@@ -72,6 +72,7 @@ export async function insertOutboxRows(
     subjectRendered: string;
     bodyRendered: string;
     mergeData: string | null;
+    sendAt?: number | null;
   }>
 ): Promise<void> {
   if (rows.length === 0) return;
@@ -80,9 +81,20 @@ export async function insertOutboxRows(
     env.DB.prepare(
       `INSERT INTO mailer_outbox
          (id, campaign_id, seq, to_email, subject_rendered, body_rendered,
-          merge_data, status, retry_count, created_at)
-       VALUES (?,?,?,?,?,?,?,?,0,?)`
-    ).bind(newId(), campaignId, r.seq, r.toEmail, r.subjectRendered, r.bodyRendered, r.mergeData, "pending", ts)
+          merge_data, status, retry_count, send_at, created_at)
+       VALUES (?,?,?,?,?,?,?,?,0,?,?)`
+    ).bind(
+      newId(),
+      campaignId,
+      r.seq,
+      r.toEmail,
+      r.subjectRendered,
+      r.bodyRendered,
+      r.mergeData,
+      "pending",
+      r.sendAt ?? null,
+      ts
+    )
   );
   // D1 batch limit is ~1000 statements per call; chunk to be safe.
   const CHUNK = 500;

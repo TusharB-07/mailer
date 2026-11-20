@@ -455,23 +455,29 @@ function renderDetail(r) {
   $("#detail-title").textContent = c.name;
   $("#detail-sub").textContent = `${c.sender_address} · ${c.schedule_mode} · batch ${c.batch_size} every ${c.interval_minutes}m`;
   const p = pct(c);
+  const now = Math.floor(Date.now() / 1000);
+  const scheduled = (r.outbox || []).filter(
+    (o) => o.status === "pending" && o.send_at && o.send_at > now
+  ).length;
   $("#detail-stats").innerHTML = `
     <div class="stat"><div class="num">${c.total_rows}</div><div class="lbl">Total</div></div>
     <div class="stat"><div class="num" style="color:var(--ok)">${c.sent_count}</div><div class="lbl">Sent</div></div>
     <div class="stat"><div class="num" style="color:var(--danger)">${c.failed_count}</div><div class="lbl">Failed</div></div>
+    <div class="stat"><div class="num" style="color:var(--accent)">${scheduled}</div><div class="lbl">Scheduled</div></div>
     <div class="stat"><div class="num">${c.total_rows - c.sent_count - c.failed_count}</div><div class="lbl">Pending</div></div>`;
   $("#btn-pause").hidden = c.status !== "active";
   $("#btn-resume").hidden = c.status === "active";
 
   const rows = (r.outbox || []).slice(0, 200);
   $("#detail-outbox").innerHTML = `<table>
-    <thead><tr><th>#</th><th>To</th><th>Status</th><th>Sent</th><th>Resend ID</th><th>Error</th></tr></thead>
+    <thead><tr><th>#</th><th>To</th><th>Status</th><th>Scheduled for</th><th>Sent</th><th>Resend ID</th><th>Error</th></tr></thead>
     <tbody>${rows
       .map(
         (o) => `<tr>
         <td>${o.seq}</td>
         <td>${escapeHtml(o.to_email)}</td>
         <td><span class="badge ${o.status}">${o.status}</span></td>
+        <td>${o.send_at ? fmtDate(o.send_at) : "—"}</td>
         <td>${fmtDate(o.sent_at)}</td>
         <td>${escapeHtml(o.resend_id || "")}</td>
         <td>${escapeHtml((o.error || "").slice(0, 80))}</td>

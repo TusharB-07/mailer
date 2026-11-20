@@ -137,6 +137,7 @@ authed.post("/api/campaigns", zValidator("json", CampaignCreateSchema), async (c
     subjectRendered: string;
     bodyRendered: string;
     mergeData: string | null;
+    sendAt: number | null;
   }> = [];
 
   let seq = 0;
@@ -145,6 +146,15 @@ authed.post("/api/campaigns", zValidator("json", CampaignCreateSchema), async (c
     const email = clean(row.email).toLowerCase();
     if (!isEmail(email)) {
       return c.json({ error: `row ${seq}: invalid email "${row.email ?? ""}"` }, 400);
+    }
+    // Per-row SendAt: ISO string -> unix seconds. Absent => campaign timing.
+    let sendAt: number | null = null;
+    if (row.sendAt) {
+      const parsed = Math.floor(Date.parse(row.sendAt) / 1000);
+      if (Number.isNaN(parsed)) {
+        return c.json({ error: `row ${seq}: invalid SendAt "${row.sendAt}"` }, 400);
+      }
+      sendAt = parsed;
     }
     const merge = buildMergeData(row as unknown as Record<string, string>, [
       "email",
@@ -165,6 +175,7 @@ authed.post("/api/campaigns", zValidator("json", CampaignCreateSchema), async (c
       subjectRendered,
       bodyRendered,
       mergeData: Object.keys(merge).length ? JSON.stringify(merge) : null,
+      sendAt,
     });
   }
 
@@ -220,9 +231,12 @@ async function fireFirstBatchInline(env: Env, c: CampaignRow | null): Promise<nu
   if (!c) return 0;
   const t = nowSec();
   const pick = await env.DB.prepare(
-    "SELECT * FROM mailer_outbox WHERE campaign_id=? AND status='pending' ORDER BY seq ASC LIMIT ?"
+    `SELECT * FROM mailer_outbox
+      WHERE campaign_id=? AND status='pending'
+        AND (send_at IS NULL OR send_at <= ?)
+      ORDER BY seq ASC LIMIT ?`
   )
-    .bind(c.id, c.batch_size)
+    .bind(c.id, t, c.batch_size)
     .all<OutboxRow>();
   const rows = (pick.results || []) as OutboxRow[];
   if (rows.length === 0) return 0;

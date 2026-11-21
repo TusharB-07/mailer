@@ -36,8 +36,11 @@ export const CampaignCreateSchema = z
     senderAddress: email,
     senderMailboxId: z.string().max(64).optional(),
     replyTo: email.optional(),
-    subjectTemplate: z.string().min(1).max(998),
-    bodyTemplate: z.string().min(1).max(200_000),
+    // Templates are OPTIONAL when every row carries its own Subject/Body.
+    // Refined below: either a campaign template OR a per-row value must exist
+    // for every row.
+    subjectTemplate: z.string().max(998).optional(),
+    bodyTemplate: z.string().max(200_000).optional(),
     rows: RowArraySchema,
     scheduleMode: z.enum(["now", "datetime", "interval"]),
     scheduledAt: z.string().optional(), // ISO 8601 string; required when mode=datetime
@@ -53,6 +56,26 @@ export const CampaignCreateSchema = z
     attachmentIds: z.array(z.string().max(64)).max(10).default([]),
   })
   .superRefine((val, ctx) => {
+    // Subject: campaign template OR every row must carry its own.
+    const hasSubjectTpl = !!val.subjectTemplate?.trim();
+    if (!hasSubjectTpl && val.rows.some((r) => !r.subject?.trim())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["subjectTemplate"],
+        message:
+          "provide a campaign subject template, or give every row its own Subject column",
+      });
+    }
+    // Body: campaign template OR every row must carry its own.
+    const hasBodyTpl = !!val.bodyTemplate?.trim();
+    if (!hasBodyTpl && val.rows.some((r) => !r.body?.trim())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["bodyTemplate"],
+        message:
+          "provide a campaign body template, or give every row its own Body column",
+      });
+    }
     if (val.scheduleMode === "datetime" && !val.scheduledAt) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

@@ -164,8 +164,9 @@ authed.post("/api/campaigns", zValidator("json", CampaignCreateSchema), async (c
       "body",
       "sendAt",
     ]);
-    const subjectTpl = row.subject || input.subjectTemplate;
-    const bodyTpl = row.body || input.bodyTemplate;
+    // Row values win; campaign template is the fallback for rows without.
+    const subjectTpl = row.subject || input.subjectTemplate || "";
+    const bodyTpl = row.body || input.bodyTemplate || "";
     const subjectRendered = renderMerge(subjectTpl, merge);
     const bodyRendered = renderMerge(bodyTpl, merge);
     if (!subjectRendered.trim()) {
@@ -191,8 +192,8 @@ authed.post("/api/campaigns", zValidator("json", CampaignCreateSchema), async (c
     senderAddress: input.senderAddress,
     senderMailboxId: sender.mailboxId,
     replyTo: input.replyTo || null,
-    subjectTemplate: input.subjectTemplate,
-    bodyTemplate: input.bodyTemplate,
+    subjectTemplate: input.subjectTemplate || "",
+    bodyTemplate: input.bodyTemplate || "",
     totalRows: rendered.length,
     status: "active",
     scheduleMode: mode,

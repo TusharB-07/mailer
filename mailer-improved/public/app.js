@@ -9,6 +9,9 @@ const state = {
   rows: [],
   headers: [],
   mergeKeys: [],
+  // True when EVERY parsed row carries its own Subject AND Body —
+  // then the campaign-level templates are optional fallbacks only.
+  rowsSelfContained: false,
   attachments: [],
   scheduleMode: "now",
   detailId: null,
@@ -218,8 +221,17 @@ function validateStep(n) {
   if (n === 2) {
     if (!$("#f-name").value.trim()) { toast("Enter a campaign name", true); return false; }
     if (!$("#f-sender").value) { toast("Pick a sender", true); return false; }
-    if (!$("#f-subject").value.trim()) { toast("Enter a subject template", true); return false; }
-    if (!$("#f-body").value.trim()) { toast("Enter a body template", true); return false; }
+    // Subject/Body templates are optional when every row provides its own.
+    if (!state.rowsSelfContained) {
+      if (!$("#f-subject").value.trim()) {
+        toast("Your sheet is missing Subject for some rows — enter a subject template as fallback", true);
+        return false;
+      }
+      if (!$("#f-body").value.trim()) {
+        toast("Your sheet is missing Body for some rows — enter a body template as fallback", true);
+        return false;
+      }
+    }
     return true;
   }
   if (n === 3) {
@@ -240,7 +252,7 @@ function renderReview() {
   const recur = $("#f-recur-freq").value;
   const tracking = $("#f-tracking").checked ? "On" : "Off";
   const sample = state.rows[0] || {};
-  const subjectRendered = ($("#f-subject").value || "").replace(/\{\{(\w+)\}\}/g, (_, k) => sample[k] || "");
+  const subjectRendered = ($("#f-subject").value || sample.subject || "").replace(/\{\{(\w+)\}\}/g, (_, k) => sample[k] || "");
   const modeLabel = mode === "now" ? "Send now (first batch immediately)"
     : mode === "datetime" ? `At ${$("#f-scheduledat").value || "—"}`
     : "Interval drip";
@@ -258,6 +270,20 @@ function renderReview() {
     <p class="muted" style="margin-top:14px">Merge tags available: ${
       state.mergeKeys.length ? state.mergeKeys.map((k) => "<code>{{" + escapeHtml(k) + "}}</code>").join(" ") : "none"
     }</p>`;
+}
+
+// Show/hide the "sheet provides its own" note + relax the required markers.
+function updateTemplateNote() {
+  const note = $("#template-note");
+  if (!note) return;
+  const need = state.rows.length > 0 && !state.rowsSelfContained;
+  note.hidden = !state.rowsSelfContained;
+  if (note) {
+    note.textContent = state.rowsSelfContained
+      ? "Every row in your sheet carries its own Subject and Body — these templates are optional. Rows win; a template (if filled) is only the fallback."
+      : "";
+  }
+  $$("#f-subject, #f-body").forEach((el) => el.required = need);
 }
 
 $("#btn-next").addEventListener("click", () => {
@@ -363,6 +389,10 @@ async function handleFile(file) {
     }
 
     state.rows = rows;
+    // Detect sheet-provided Subject + Body: templates become optional.
+    state.rowsSelfContained =
+      rows.length > 0 && rows.every((r) => (r.subject || "").trim()) && rows.every((r) => (r.body || "").trim());
+    updateTemplateNote();
     state.headers = Object.keys(rows[0]);
     state.mergeKeys = state.headers.filter(
       (h) => !["email", "subject", "body", "sendat", "send_at"].includes(h.toLowerCase())
@@ -448,15 +478,19 @@ function renderAttachments() {
 $("#btn-preview").addEventListener("click", async () => {
   const subject = $("#f-subject") ? $("#f-subject").value : "";
   const body = $("#f-body") ? $("#f-body").value : "";
-  if (!subject.trim() || !body.trim()) {
-    toast("Fill the subject and body templates first", true);
+  const sample = state.rows[0] || {};
+  // Fall back to the first row's own Subject/Body when templates are empty
+  // and the sheet provides them.
+  const effSubject = subject.trim() || sample.subject || "";
+  const effBody = body.trim() || sample.body || "";
+  if (!effSubject.trim() || !effBody.trim()) {
+    toast("Fill the subject and body templates first (or upload a sheet with Subject + Body columns)", true);
     return;
   }
-  const sample = state.rows[0] || {};
   try {
     const r = await api("/api/preview", {
       method: "POST",
-      body: JSON.stringify({ subjectTemplate: subject, bodyTemplate: body, sampleData: sample }),
+      body: JSON.stringify({ subjectTemplate: effSubject, bodyTemplate: effBody, sampleData: sample }),
     });
     $("#preview-subject").textContent = r.subject || "(empty)";
     const frame = $("#preview-frame");

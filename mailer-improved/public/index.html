@@ -143,13 +143,14 @@
                   <input id="f-replyto" type="email" placeholder="replies@asterick.tech" />
                 </label>
                 <label class="field">
-                  <span>Subject template</span>
-                  <input id="f-subject" placeholder="Hi {{Name}}, a quick note" required />
+                  <span>Subject template <em id="subject-req" style="font-style:normal;color:var(--muted-foreground)">(optional when the sheet provides it)</em></span>
+                  <input id="f-subject" placeholder="Hi {{Name}}, a quick note — or leave empty if the sheet has Subject" />
                 </label>
                 <label class="field">
-                  <span>Body template (HTML)</span>
-                  <textarea id="f-body" rows="8" placeholder="<p>Hello {{Name}}, ...</p>" required></textarea>
+                  <span>Body template (HTML) <em id="body-req" style="font-style:normal;color:var(--muted-foreground)">(optional when the sheet provides it)</em></span>
+                  <textarea id="f-body" rows="8" placeholder="&lt;p&gt;Hello {{Name}}, ...&lt;/p&gt; — or leave empty if the sheet has Body"></textarea>
                 </label>
+                <p id="template-note" class="muted" hidden style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.04em"></p>
                 <button type="button" id="btn-preview" class="btn outline">Live preview</button>
 
                 <div class="attach-section">
